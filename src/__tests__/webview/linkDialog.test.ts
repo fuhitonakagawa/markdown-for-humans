@@ -22,9 +22,8 @@ afterEach(() => {
   mockGetMarkRange.mockReset();
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const createMockEditor = (overrides: Partial<any> = {}) => {
-  const defaultSelection = { from: 0, to: 0, empty: true, $from: {} as any };
+const createMockEditor = (overrides: Record<string, unknown> = {}) => {
+  const defaultSelection = { from: 0, to: 0, empty: true, $from: {} as unknown };
 
   const defaultDoc = {
     textBetween: jest.fn(() => ''),
@@ -35,13 +34,14 @@ const createMockEditor = (overrides: Partial<any> = {}) => {
     }),
   };
 
-  const makeTransaction = (doc: any) => {
-    const tr: any = {};
-    tr.doc = doc;
-    tr.removeMark = jest.fn(() => tr);
-    tr.insertText = jest.fn(() => tr);
-    tr.addMark = jest.fn(() => tr);
-    tr.setSelection = jest.fn(() => tr);
+  const makeTransaction = (doc: unknown) => {
+    const tr: { doc: unknown; removeMark: jest.Mock; insertText: jest.Mock; addMark: jest.Mock; setSelection: jest.Mock } = {
+      doc,
+      removeMark: jest.fn(() => tr),
+      insertText: jest.fn(() => tr),
+      addMark: jest.fn(() => tr),
+      setSelection: jest.fn(() => tr),
+    };
     return tr;
   };
 
@@ -50,20 +50,20 @@ const createMockEditor = (overrides: Partial<any> = {}) => {
     schema: { marks: { link: { create: jest.fn(attrs => ({ attrs })) } } },
     doc: defaultDoc,
     ...(overrides.state || {}),
-  };
+  } as unknown as { selection: unknown; schema: { marks: { link: { create: jest.Mock } } }; doc: unknown; tr?: unknown };
 
   if (!state.schema?.marks?.link?.create) {
     state.schema.marks.link = { create: jest.fn(attrs => ({ attrs })) };
   }
 
-  if (!state.doc.resolve) {
-    state.doc.resolve = defaultDoc.resolve;
+  if (!(state.doc as { resolve?: unknown }).resolve) {
+    (state.doc as { resolve: unknown }).resolve = defaultDoc.resolve;
   }
 
-  const tr = (overrides.state && (overrides.state as any).tr) || makeTransaction(state.doc);
+  const tr = (overrides.state && (overrides.state as unknown as { tr?: unknown }).tr) || makeTransaction(state.doc);
   state.tr = tr;
 
-  const view = (overrides as any).view || { dispatch: jest.fn(), focus: jest.fn() };
+  const view = (overrides as unknown as { view?: { dispatch: jest.Mock; focus: jest.Mock } }).view || { dispatch: jest.fn(), focus: jest.fn() };
 
   // Cast as unknown then Editor since we're using a partial mock
   return {
@@ -79,13 +79,13 @@ const createMockEditor = (overrides: Partial<any> = {}) => {
 describe('linkDialog', () => {
   it('prefills full link text and URL when cursor is inside a link mark', () => {
     const doc = { textBetween: jest.fn(() => 'product') };
-    const selection = { from: 0, to: 0, empty: true, $from: {} as any };
+    const selection = { from: 0, to: 0, empty: true, $from: {} as unknown };
     const editor = createMockEditor({
       state: {
-        selection,
-        schema: { marks: { link: {} } },
+        selection: selection as unknown,
+        schema: { marks: { link: {} as unknown } },
         doc,
-      },
+      } as unknown,
       getAttributes: jest.fn(() => ({ href: 'https://example.com' })),
     });
 
@@ -103,9 +103,9 @@ describe('linkDialog', () => {
 
   it('prefills with explicit selection text when not inside a link', () => {
     const doc = { textBetween: jest.fn(() => 'selected range') };
-    const selection = { from: 2, to: 16, empty: false, $from: {} as any };
+    const selection = { from: 2, to: 16, empty: false, $from: {} as unknown };
     const editor = createMockEditor({
-      state: { selection, schema: { marks: { link: {} } }, doc },
+      state: { selection: selection as unknown, schema: { marks: { link: {} as unknown } }, doc },
     });
 
     mockGetMarkRange.mockReturnValue(null);
@@ -133,13 +133,20 @@ describe('linkDialog', () => {
         pos,
       }),
     };
-    const selection = { from: 5, to: 13, empty: false, $from: {} as any };
+    const selection = { from: 5, to: 13, empty: false, $from: {} as unknown };
 
-    const chain: any = {
+    type ChainType = {
+      focus: () => ChainType;
+      extendMarkRange: () => ChainType;
+      setLink: () => ChainType;
+      command: (cb: (args: { tr: { insertText: jest.Mock }; state: { selection: unknown; doc: unknown } }) => void) => ChainType;
+      run: jest.Mock;
+    };
+    const chain: ChainType = {
       focus: jest.fn(() => chain),
       extendMarkRange: jest.fn(() => chain),
       setLink: jest.fn(() => chain),
-      command: jest.fn((cb: any) => {
+      command: jest.fn((cb: (args: { tr: { insertText: jest.Mock }; state: { selection: unknown; doc: unknown } }) => void) => {
         cb({ tr: { insertText }, state: { selection, doc } });
         return chain;
       }),
