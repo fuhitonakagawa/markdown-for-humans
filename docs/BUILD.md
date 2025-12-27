@@ -9,25 +9,57 @@ This document describes the stable, verified build process for the Markdown for 
 
 ## Build Process
 
-### Development Build
+The extension uses a two-state build system: **debug** (for development) and **release** (for marketplace).
+
+### Debug Build (Default)
+
+Debug builds include sourcemaps and console logs for easier debugging:
 
 ```bash
 # Install dependencies
 npm install
 
-# Build extension and webview
-npm run build
+# Build extension and webview (debug mode)
+npm run build:debug
 
-# Verify build (automatically checks for missing features)
-npm run verify-build
+# Watch for changes and rebuild automatically
+npm run watch:debug
 ```
 
-### Watch Mode (Development)
+### Release Build (Marketplace)
+
+Release builds are optimized, minified, and verified before publishing:
 
 ```bash
-# Watch for changes and rebuild automatically
-npm run watch
+# Build and verify for marketplace
+npm run build:release
+
+# This automatically:
+# - Minifies code
+# - Removes console.log/debug/info (keeps warn/error)
+# - Removes sourcemaps
+# - Runs verification checks
 ```
+
+## Console Logging Strategy
+
+The build system automatically handles console logging based on build type:
+
+### Debug Builds (`npm run build:debug`)
+- ✅ `console.log()` - Kept (development debugging)
+- ✅ `console.debug()` - Kept (verbose debugging)
+- ✅ `console.info()` - Kept (informational)
+- ✅ `console.warn()` - Kept (non-fatal warnings)
+- ✅ `console.error()` - Kept (errors)
+
+### Release Builds (`npm run build:release`)
+- ❌ `console.log()` - **Removed** (noisy debug info)
+- ❌ `console.debug()` - **Removed** (verbose debug)
+- ❌ `console.info()` - **Removed** (informational)
+- ✅ `console.warn()` - **Kept** (important warnings for users)
+- ✅ `console.error()` - **Kept** (critical errors for debugging issues)
+
+This is implemented using esbuild's `pure` option to mark debug console calls as side-effect-free, allowing them to be safely removed during minification.
 
 ## Build Verification
 
@@ -40,6 +72,8 @@ The verification script checks:
 1. **JavaScript Features**: Critical functions and message types in both extension and webview bundles
 2. **CSS Classes**: UI components like `.image-resize-icon`, `.image-resize-modal-panel`
 3. **Bundle Sizes**: Ensures bundles are within expected size ranges
+4. **Source Maps**: Ensures release builds don't include sourcemap files
+5. **Console Calls**: Ensures release builds don't contain console.log/debug/info
 
 ### Running Verification Manually
 
@@ -82,14 +116,27 @@ const CRITICAL_FEATURES = {
 
 ## Package & Release
 
-### Create Package
+### Development Workflow
 
+**During development:**
+- Use **F5 debugging** in VS Code (no packaging needed)
+- VS Code automatically builds and runs the extension
+- Full debugging capabilities with breakpoints and console logs
+
+**For final testing before release:**
 ```bash
-# Package extension (includes build + verification)
-npm run package
+# Create release package (automatically runs build:release via vscode:prepublish hook)
+npm run package:release
+
+# Install and test locally
+code --install-extension markdown-for-humans-0.1.0.vsix
 ```
 
-This creates a `.vsix` file (e.g., `markdown-for-humans-0.1.0.vsix`).
+**Note:** `npm run package:release` always creates a **release build** via the `vscode:prepublish` hook. This ensures:
+- ✅ You test the exact same build that will be published
+- ✅ No debug logs or sourcemaps in the package
+- ✅ Minified and optimized for production
+- ✅ Verified before packaging
 
 ### Publish to VS Code Marketplace
 
@@ -112,7 +159,7 @@ vsce publish
 
 **Using npm script:**
 ```bash
-npm run publish  # Runs: vsce publish (current version)
+npm run publish:release  # Runs: vsce publish (current version)
 ```
 
 ### Publish to Open VSX Registry (For Cursor, Windsurf, VSCodium & More)
@@ -167,14 +214,31 @@ ovsx publish -p <your-token>
 - **Minification**: Enabled
 - **CSS Bundling**: Inline via esbuild CSS loader
 
-### Key Build Options
+### Build Commands
 
 ```json
 {
-  "build:extension": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --minify --tree-shaking=true",
-  "build:webview": "esbuild src/webview/editor.ts --bundle --outfile=dist/webview.js --format=iife --sourcemap --minify --tree-shaking=true --loader:.css=css --loader:.ttf=file"
+  "build:debug": "Debug build (development)",
+  "build:release": "Release build (marketplace)",
+
+  "build:extension:debug": "node scripts/build-extension.js",
+  "build:extension:release": "node scripts/build-extension.js --prod --no-sourcemap",
+
+  "build:webview:debug": "node scripts/build-webview.js",
+  "build:webview:release": "node scripts/build-webview.js --prod --no-sourcemap",
+
+  "watch:debug": "Live reload for development",
+  "watch:extension:debug": "node scripts/build-extension.js --watch",
+  "watch:webview:debug": "node scripts/build-webview.js --watch"
 }
 ```
+
+### Build Script Flags
+
+- **No flags** - Debug build (sourcemaps, all console.*, no minification)
+- **`--prod`** - Production build (minified, console cleanup, no sourcemaps)
+- **`--watch`** - Watch mode (debug build with live reload)
+- **`--no-sourcemap`** - Explicitly disable sourcemaps (marketplace builds)
 
 ## Adding New Features
 
@@ -232,7 +296,7 @@ webviewCss: {
 
 ### 5. Test the verification
 ```bash
-npm run build
+npm run build:debug
 npm run verify-build  # Should pass with your new feature
 ```
 
@@ -296,7 +360,7 @@ If this passes, your build is good. If it fails, see below.
 ```bash
 # Clean and rebuild
 rm -rf dist/
-npm run build
+npm run build:debug
 npm run verify-build
 ```
 
@@ -447,7 +511,7 @@ ls -lh dist/
 
 1. Always test the actual .vsix file before publishing:
    ```bash
-   npm run package
+   npm run package:release
    code --install-extension markdown-for-humans-0.1.0.vsix
    ```
 
@@ -469,18 +533,18 @@ grep "myBrokenFeature" extension/dist/webview.js
 ```bash
 # Fix the issue in code
 # Rebuild with verification
-npm run build
+npm run build:debug
 npm run verify-build
 
 # Bump patch version
 npm version patch
 
 # Package and test locally
-npm run package
+npm run package:release
 code --install-extension markdown-for-humans-0.1.1.vsix
 
 # Test thoroughly, then publish
-npm run publish
+npm run publish:release
 ```
 
 #### Step 3: Post-mortem
@@ -560,14 +624,21 @@ node -e "console.log(require('./meta.json'))"
 
 ### 2. Build & Verify
 ```bash
-npm run build       # Build extension + webview
-npm run verify-build  # Verify critical features present
-npm test            # Run all tests
+npm run build:release  # Build with release settings
+npm test              # Run all tests
+# verify-build runs automatically with build:release
 ```
 
 ### 3. Local Testing
+
+**Option A: F5 Debugging (Recommended for development)**
+- Press F5 in VS Code to launch extension in debug mode
+- Full breakpoints, console logs, and live reload
+- No packaging needed
+
+**Option B: Package Testing (Final verification before release)**
 ```bash
-npm run package     # Creates .vsix file
+npm run package:release  # Creates release .vsix (via vscode:prepublish hook)
 code --install-extension markdown-for-humans-X.Y.Z.vsix
 ```
 
@@ -578,6 +649,7 @@ Test these features manually:
 - [ ] Table editing
 - [ ] Export to PDF/DOCX
 - [ ] Markdown to HTML rendering
+- [ ] Check browser console for errors (no console.log in release build)
 
 ### 4. Publish
 ```bash
@@ -604,33 +676,38 @@ steps:
     with:
       node-version: '18'
   - run: npm ci
-  - run: npm run build
-  - run: npm run verify-build
+  - run: npm run lint
   - run: npm test
-  - run: npm run package
+  - run: npm run build:release  # Build and verify
+  - run: npm run package:release # vscode:prepublish runs build:release again, then packages
 ```
+
+**Note:**
+- `npm run package:release` automatically runs `vscode:prepublish` which executes `build:release`
+- This ensures CI always tests the exact build that will be published
+- The build happens twice (once explicitly, once via hook) but ensures consistency
 
 ## Quick Reference
 
 ### Quick Commands
 ```bash
 # Development
-npm run watch               # Auto-rebuild on changes
-npm run build              # One-time build
+npm run build:debug        # Debug build (sourcemaps, all logs)
+npm run watch:debug        # Auto-rebuild on changes (debug mode)
 npm run verify-build       # Check build integrity
 
 # Testing
 npm test                   # Run tests
 npm run test:coverage      # With coverage
 
-# Release
-npm run package            # Create .vsix
-vsce publish patch         # Publish to VS Code Marketplace (auto-bumps version)
-ovsx publish -p <token>    # Publish to Open VSX (for Cursor & Windsurf)
-                          # First time: ovsx create-namespace concretio -p <token>
+# Packaging
+npm run package:release    # Release package (via vscode:prepublish hook)
 
-# Debugging
-npm run build:webview -- --sourcemap  # Build with source maps
+# Publishing
+vsce publish patch         # Publish to VS Code Marketplace (auto-bumps version)
+npm run publish:release    # Or use: npm run publish:release (runs vsce publish)
+npm run publish:ovsx:release  # Publish to Open VSX (for Cursor & Windsurf)
+                           # First time: ovsx create-namespace concretio -p <token>
 ```
 
 ### Expected Bundle Sizes

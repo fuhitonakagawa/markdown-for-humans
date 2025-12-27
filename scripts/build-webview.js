@@ -14,6 +14,7 @@
  */
 
 const esbuild = require('esbuild');
+const fs = require('fs');
 
 const args = process.argv.slice(2);
 const isProduction = args.includes('--prod') || process.env.NODE_ENV === 'production';
@@ -54,6 +55,16 @@ async function build() {
     // One-time build
     try {
       await esbuild.build(buildOptions);
+      if (isProduction || noSourcemap) {
+        // Ensure release builds don't leave stale sourcemaps in dist/
+        for (const mapFile of ['dist/webview.js.map', 'dist/webview.css.map']) {
+          try {
+            fs.unlinkSync(mapFile);
+          } catch {
+            // ignore
+          }
+        }
+      }
       console.log(`✅ Webview build complete${isProduction ? ' (production)' : ' (development)'}`);
     } catch (error) {
       console.error('❌ Build failed:', error);

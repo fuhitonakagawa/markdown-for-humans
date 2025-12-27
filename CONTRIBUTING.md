@@ -29,11 +29,11 @@ cd markdown-for-humans
 # Install dependencies
 npm install
 
-# Build the extension
-npm run build
+# Build the extension (debug mode)
+npm run build:debug
 
 # Start watch mode (auto-rebuild on changes)
-npm run watch
+npm run watch:debug
 
 # In VS Code: Press F5 to launch Extension Development Host
 ```
@@ -71,11 +71,11 @@ npm install
 ### 2. Build the Extension
 
 ```bash
-# One-time build
-npm run build
+# One-time build (debug mode)
+npm run build:debug
 
 # Or watch mode (recommended for development)
-npm run watch
+npm run watch:debug
 ```
 
 ### 3. Launch Extension Development Host
@@ -163,7 +163,7 @@ VS Code TextDocument updated
 - Press `Ctrl+Shift+F5` (Cmd+Shift+F5 on Mac) to restart
 
 **Webview code** (`src/webview/*`):
-- With `npm run watch`, changes auto-compile
+- With `npm run watch:debug`, changes auto-compile
 - Reload the webview: close and reopen the markdown file, or run command `Developer: Reload Webview`
 
 ### Adding a New Feature
@@ -236,17 +236,20 @@ describe('Feature', () => {
 ### Build Commands
 
 ```bash
-# Development build
-npm run build
+# Development build (debug mode - sourcemaps, console logs)
+npm run build:debug
+
+# Release build (minified, no logs, verified)
+npm run build:release
 
 # Verify build integrity (checks critical features)
 npm run verify-build
 
-# Package as .vsix file
-npm run package
+# Package as .vsix file (for marketplace)
+npm run package:release
 
-# Full production build + package
-npm run build && npm run package
+# Full release build + package
+npm run build:release && npm run package:release
 ```
 
 ### Install Local Package
@@ -402,7 +405,7 @@ See [roadmap/README.md](./roadmap/README.md) for detailed planning workflow.
 
 - [ ] Tests added/updated and passing
 - [ ] Linting passes (`npm run lint`)
-- [ ] Build succeeds (`npm run build && npm run verify-build`)
+- [ ] Build succeeds (`npm run build:release`)
 - [ ] Documentation updated if needed
 - [ ] Commit messages follow conventions
 - [ ] PR description explains changes

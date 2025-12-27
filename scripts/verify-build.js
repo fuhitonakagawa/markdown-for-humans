@@ -12,6 +12,32 @@
 const fs = require('fs');
 const path = require('path');
 
+function assertNoProdConsoleCalls(bundleName, content) {
+  const disallowed = ['console.log(', 'console.debug(', 'console.info('];
+  const found = disallowed.filter(token => content.includes(token));
+  if (found.length > 0) {
+    console.error(`   ❌ Production bundle contains disallowed console calls:`);
+    found.forEach(token => console.error(`      - ${token}`));
+    console.error(`   Fix: ensure the build uses esbuild 'pure' (or equivalent) for console.log/debug/info.\n`);
+    return false;
+  }
+  return true;
+}
+
+function assertNoSourcemapsInDist() {
+  const distPath = path.join(process.cwd(), 'dist');
+  if (!fs.existsSync(distPath)) return true;
+  const distFiles = fs.readdirSync(distPath);
+  const maps = distFiles.filter((f) => f.endsWith('.map'));
+  if (maps.length > 0) {
+    console.error(`   ❌ Release build left sourcemaps in dist/:`);
+    maps.forEach((f) => console.error(`      - dist/${f}`));
+    console.error(`   Fix: run release builds with --no-sourcemap and/or delete stale maps.\n`);
+    return false;
+  }
+  return true;
+}
+
 // Define critical features that MUST be in the bundle
 const CRITICAL_FEATURES = {
   webviewJs: {
@@ -50,6 +76,10 @@ let hasWarnings = false;
 
 console.log('\n🔍 Verifying build outputs...\n');
 
+if (!assertNoSourcemapsInDist()) {
+  process.exit(1);
+}
+
 // Check each feature bundle
 for (const [bundleName, config] of Object.entries(CRITICAL_FEATURES)) {
   const filePath = path.join(process.cwd(), config.file);
@@ -63,6 +93,16 @@ for (const [bundleName, config] of Object.entries(CRITICAL_FEATURES)) {
   }
 
   const content = fs.readFileSync(filePath, 'utf8');
+
+  // Sanity check: release/production bundles must not contain noisy console methods.
+  // We keep console.warn/error for diagnostics, but log/debug/info should be stripped.
+  if (bundleName === 'webviewJs' || bundleName === 'extensionJs') {
+    if (!assertNoProdConsoleCalls(bundleName, content)) {
+      hasErrors = true;
+      continue;
+    }
+  }
+
   const missing = [];
   const found = [];
 

@@ -2,13 +2,35 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Build Extension",
+      "label": "Build Extension (Debug)",
       "type": "npm",
-      "script": "build",
+      "script": "build:debug",
       "group": {
         "kind": "build",
         "isDefault": true
       },
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Build Extension (Release)",
+      "type": "npm",
+      "script": "build:release",
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Watch Extension (Debug)",
+      "type": "npm",
+      "script": "watch:debug",
+      "isBackground": true,
       "presentation": {
         "reveal": "always",
         "panel": "new"
@@ -26,9 +48,9 @@
       "problemMatcher": []
     },
     {
-      "label": "Package Extension",
+      "label": "Package Extension (Release)",
       "type": "npm",
-      "script": "package",
+      "script": "package:release",
       "presentation": {
         "reveal": "always",
         "panel": "new"

@@ -13,10 +13,10 @@ Quick checklist for publishing Markdown for Humans to VS Code Marketplace.
 # Edit CHANGELOG.md with new version details
 
 # 2. Run full test suite
-npm run lint:fix && npm test && npm run build && npm run verify-build
+npm run lint:fix && npm test && npm run build:release
 
 # 3. Test locally
-npm run package
+npm run package:release
 code --install-extension markdown-for-humans-*.vsix
 # Test features manually
 
@@ -57,14 +57,14 @@ git push origin --tags
 ### Code Quality
 - [ ] Fix linting issues: `npm run lint:fix`
 - [ ] All tests pass: `npm test`
-- [ ] Build succeeds: `npm run build && npm run verify-build`
+- [ ] Build succeeds: `npm run build:release`
 
 ### Version & Changelog
 - [ ] Update `CHANGELOG.md` with new version section
 - [ ] Commit all changes (version will be auto-bumped during publish)
 
 ### Package & Test
-- [ ] Create package: `npm run package`
+- [ ] Create package: `npm run package:release`
 - [ ] Verify `.vsix` file created and size < 10MB
 - [ ] Test local installation: `code --install-extension markdown-for-humans-<version>.vsix`
 - [ ] Test core features in Extension Development Host:
@@ -169,7 +169,7 @@ git push origin --tags
 **Quick Commands:**
 ```bash
 # Full test cycle before publishing
-npm run lint:fix && npm test && npm run build && npm run verify-build && npm run package
+npm run lint:fix && npm test && npm run build:release && npm run package:release
 
 # Publish to VS Code Marketplace
 vsce login concretio

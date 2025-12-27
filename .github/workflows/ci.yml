@@ -39,11 +39,8 @@ jobs:
           files: ./coverage/lcov.info
           fail_ci_if_error: false
 
-      - name: Build extension
-        run: npm run build
-
-      - name: Verify build
-        run: npm run verify-build
+      - name: Build extension (release)
+        run: npm run build:release
 
   # Ensure the extension can be packaged
   package:
@@ -62,11 +59,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build and package
-        run: |
-          npm run build
-          npm run verify-build
-          npm run package
+      - name: Package extension
+        run: npm run package:release
 
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v4
