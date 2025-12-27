@@ -2,7 +2,7 @@
   "name": "markdown-for-humans",
   "displayName": "Markdown for Humans",
   "description": "Seamless WYSIWYG markdown editing for VS Code — Write markdown the way humans think",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "concretio",
   "author": {
     "name": "Abhinav",
