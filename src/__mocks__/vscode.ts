@@ -5,6 +5,35 @@
  * For integration tests that need real VS Code, use @vscode/test-electron.
  */
 
+// Type definitions for mocks
+export interface MockUri {
+  fsPath: string;
+  path: string;
+  scheme: string;
+  toString?: () => string;
+  uri?: string;
+}
+
+export interface MockRange {
+  start: Position;
+  end: Position;
+}
+
+export interface MockTextDocument {
+  getText(range?: MockRange): string;
+  languageId: string;
+  uri: MockUri;
+  fileName: string;
+  lineCount: number;
+  lineAt(line: number): { text: string; lineNumber: number };
+}
+
+export interface MockTextEditor {
+  document: MockTextDocument;
+  selection: Selection;
+  selections: Selection[];
+}
+
 // Mock StatusBarItem
 export const mockStatusBarItem = {
   text: '',
@@ -52,7 +81,7 @@ export const window = {
 export const workspace = {
   onDidChangeTextDocument: jest.fn(() => ({ dispose: jest.fn() })),
   getWorkspaceFolder: jest.fn(),
-  workspaceFolders: undefined as any,
+  workspaceFolders: undefined as Array<{ uri: MockUri; name: string; index: number }> | undefined,
   getConfiguration: jest.fn(() => ({
     get: jest.fn((_key: string, defaultValue?: unknown) => defaultValue),
     update: jest.fn(),
@@ -91,9 +120,10 @@ export enum ConfigurationTarget {
 }
 
 // Mock TextDocument
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function createMockTextDocument(content: string, languageId = 'markdown'): any {
   return {
-    getText: jest.fn((range?: any) => {
+    getText: jest.fn((range?: MockRange) => {
       if (range) {
         // Simplified range extraction
         return content;
@@ -101,7 +131,7 @@ export function createMockTextDocument(content: string, languageId = 'markdown')
       return content;
     }),
     languageId,
-    uri: Uri.file('/test/document.md'),
+    uri: Uri.file('/test/document.md') as MockUri,
     fileName: '/test/document.md',
     lineCount: content.split('\n').length,
     lineAt: jest.fn((line: number) => ({
@@ -124,6 +154,7 @@ export class Selection {
 }
 
 // Mock TextEditor
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function createMockTextEditor(document: any, selection?: Selection): any {
   return {
     document,
@@ -152,13 +183,13 @@ export class Position {
 
 // Tree item + visuals
 export class TreeItem {
-  public iconPath: any;
+  public iconPath: ThemeIcon | MockUri | { light: MockUri; dark: MockUri } | undefined;
   public description?: string;
-  public command?: any;
+  public command?: { command: string; title: string; arguments?: unknown[] };
   public contextValue?: string;
   constructor(
     public label: string,
-    public collapsibleState?: any
+    public collapsibleState?: number
   ) {}
 }
 
@@ -177,7 +208,7 @@ export const TreeItemCollapsibleState = {
 export class ThemeIcon {
   constructor(
     public id: string,
-    public color?: any
+    public color?: ThemeColor
   ) {}
 }
 
@@ -210,9 +241,9 @@ export class Range {
 
 // Minimal WorkspaceEdit mock
 export class WorkspaceEdit {
-  public replaces: Array<{ uri: any; range: Range; text: string }> = [];
+  public replaces: Array<{ uri: MockUri; range: Range; text: string }> = [];
 
-  replace(uri: any, range: Range, text: string) {
+  replace(uri: MockUri, range: Range, text: string) {
     this.replaces.push({ uri, range, text });
   }
 }
