@@ -206,7 +206,7 @@ npm run package
 code --install-extension markdown-for-humans-0.1.1.vsix
 
 # Test thoroughly, then publish
-npm run publish
+vsce publish patch  # Auto-bumps version and publishes
 ```
 
 ### Step 3: Post-mortem

@@ -2,6 +2,56 @@
 
 Quick checklist for publishing Markdown for Humans to VS Code Marketplace.
 
+---
+
+## 📋 Release Workflow Summary
+
+### Standard Release (Recommended)
+
+```bash
+# 1. Update changelog
+# Edit CHANGELOG.md with new version details
+
+# 2. Run full test suite
+npm run lint:fix && npm test && npm run build && npm run verify-build
+
+# 3. Test locally
+npm run package
+code --install-extension markdown-for-humans-*.vsix
+# Test features manually
+
+# 4. Commit changes (version will auto-bump on publish)
+git add CHANGELOG.md
+git commit -m "chore: prepare release"
+git push
+
+# 5. Publish to VS Code Marketplace (auto-bumps version)
+vsce login concretio
+vsce publish patch  # Choose: patch, minor, or major
+
+# 6. Publish to Open VSX Registry (for Cursor & Windsurf)
+# First time only: ovsx create-namespace concretio -p <your-token>
+ovsx publish -p <your-token>
+
+# 7. Create git tag AFTER publish
+git tag v$(node -p "require('./package.json').version")
+git push origin --tags
+
+# 8. Create GitHub release
+# Go to: https://github.com/concretios/markdown-for-humans/releases/new
+# Select the tag, add release notes, publish
+```
+
+### Version Bump Types
+
+| Command | Use Case | Example |
+|---------|----------|---------|
+| `vsce publish patch` | Bug fixes, minor updates | 0.1.0 → 0.1.1 |
+| `vsce publish minor` | New features, non-breaking | 0.1.1 → 0.2.0 |
+| `vsce publish major` | Breaking changes | 0.2.0 → 1.0.0 |
+
+---
+
 ## Pre-Release
 
 ### Code Quality
@@ -9,12 +59,9 @@ Quick checklist for publishing Markdown for Humans to VS Code Marketplace.
 - [ ] All tests pass: `npm test`
 - [ ] Build succeeds: `npm run build && npm run verify-build`
 
-### Version & Tag
-- [ ] Update `package.json` version
+### Version & Changelog
 - [ ] Update `CHANGELOG.md` with new version section
-- [ ] Commit all changes
-- [ ] Create git tag: `git tag v<version>`
-- [ ] Push tag: `git push origin v<version>`
+- [ ] Commit all changes (version will be auto-bumped during publish)
 
 ### Package & Test
 - [ ] Create package: `npm run package`
@@ -45,37 +92,101 @@ Quick checklist for publishing Markdown for Humans to VS Code Marketplace.
 - [ ] 2FA enabled on publishing account
 - [ ] Personal Access Token created (scope: "Marketplace (Manage)")
 
-### Publish
-- [ ] Login: `vsce login concretio`
-- [ ] Publish: `npm run publish`
-- [ ] Or upload via web: https://marketplace.visualstudio.com/manage
+### Publish to VS Code Marketplace
 
-### GitHub Release
+**Recommended: Automatic version bump + publish**
+- [ ] Login: `vsce login concretio`
+- [ ] Choose version type and publish:
+  - `vsce publish patch` — Bug fixes (0.1.0 → 0.1.1)
+  - `vsce publish minor` — New features (0.1.1 → 0.2.0)
+  - `vsce publish major` — Breaking changes (0.2.0 → 1.0.0)
+
+**Alternative: Manual version control**
+- [ ] Update version in `package.json` manually
+- [ ] Run `vsce publish` (publishes current version)
+
+**Alternative: Web upload**
+- [ ] Build: `npm run package:marketplace`
+- [ ] Upload `.vsix` at https://marketplace.visualstudio.com/manage
+
+### Publish to Open VSX Registry (For Cursor, Windsurf, VSCodium & More)
+
+**Why:** Makes extension available in Open VSX-compatible editors:
+- Cursor IDE
+- Windsurf Editor
+- VSCodium
+- Gitpod
+- Eclipse Theia
+- Other Open VSX-compatible IDEs
+
+**One-Time Setup (First Publish Only):**
+- [ ] Install ovsx CLI: `npm install -g ovsx`
+- [ ] Get token from https://open-vsx.org/user-settings/tokens
+- [ ] Create namespace: `ovsx create-namespace concretio -p <your-token>`
+  - ⚠️ **Required before first publish** - namespace must match publisher in package.json
+  - Only needed once per publisher
+
+**Every Release:**
+- [ ] Publish: `ovsx publish -p <your-token>`
+- [ ] Verify at https://open-vsx.org/extension/concretio/markdown-for-humans
+
+### Git Tag & GitHub Release (Post-Publish)
+
+**Create Git Tag:**
+- [ ] Check published version: `cat package.json | grep version`
+- [ ] Create tag: `git tag v<version>` (e.g., `git tag v0.1.1`)
+- [ ] Push tag: `git push origin v<version>`
+
+**Create GitHub Release:**
 - [ ] Create release: https://github.com/concretios/markdown-for-humans/releases/new
-- [ ] Tag: `v<version>`
+- [ ] Select tag: `v<version>` (just created)
 - [ ] Title: "v<version> - <description>"
 - [ ] Description: Copy from CHANGELOG.md
-- [ ] Attach `.vsix` file
+- [ ] Attach `.vsix` file (optional)
 - [ ] Mark as "Latest release"
 - [ ] Publish
 
 ## Post-Release
 
-- [ ] Extension appears in Marketplace
+### Verify VS Code Marketplace
+- [ ] Extension appears: https://marketplace.visualstudio.com/items?itemName=concretio.markdown-for-humans
 - [ ] All metadata correct
 - [ ] Screenshots display correctly
 - [ ] Links work
-- [ ] Test installation from Marketplace URL
-- [ ] Update README.md Marketplace badge/link if needed
+- [ ] Test installation from VS Code
+
+### Verify Open VSX Registry
+- [ ] Extension appears: https://open-vsx.org/extension/concretio/markdown-for-humans
+- [ ] All metadata correct
+- [ ] Test installation from at least one Open VSX-compatible IDE:
+  - [ ] Cursor IDE
+  - [ ] Windsurf Editor
+  - [ ] VSCodium
+  - [ ] Other (specify): _______
 
 ---
 
 **Quick Commands:**
 ```bash
-# Full test cycle
+# Full test cycle before publishing
 npm run lint:fix && npm test && npm run build && npm run verify-build && npm run package
 
-# Publish
-vsce login concretio && npm run publish
+# Publish to VS Code Marketplace
+vsce login concretio
+vsce publish patch  # For bug fixes (0.1.0 → 0.1.1)
+# or: vsce publish minor  # For new features (0.1.1 → 0.2.0)
+# or: vsce publish major  # For breaking changes (0.2.0 → 1.0.0)
+
+# Publish to Open VSX (for Cursor, Windsurf, VSCodium & more)
+# First time only: ovsx create-namespace concretio -p <your-token>
+ovsx publish -p <your-token>
+
+# After publishing, create git tag
+git tag v$(node -p "require('./package.json').version")
+git push origin --tags
 ```
+
+**Notes:**
+- Get Open VSX token from https://open-vsx.org/user-settings/tokens
+- First publish requires creating namespace: `ovsx create-namespace concretio -p <your-token>`
 

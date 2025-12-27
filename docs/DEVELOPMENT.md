@@ -529,8 +529,8 @@ npm run package
 # Test .vsix file locally
 # (Install in VS Code: Extensions > ... > Install from VSIX)
 
-# Publish to marketplace
-npm run publish
+# Publish to marketplace with version bump
+vsce publish patch  # Choose: patch, minor, or major
 ```
 
 **Post-Release:**

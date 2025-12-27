@@ -2,7 +2,7 @@
 
 **Seamless WYSIWYG markdown editing for VS Code** — Write markdown the way humans think.
 
-![VS Code Marketplace](https://img.shields.io/badge/VS%20Code-Marketplace-blue?logo=visual-studio-code) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg) ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
+[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/concretio.markdown-for-humans?label=VS%20Code%20Marketplace&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=concretio.markdown-for-humans) [![Open VSX](https://img.shields.io/open-vsx/v/concretio/markdown-for-humans?label=Open%20VSX&logo=eclipse)](https://open-vsx.org/extension/concretio/markdown-for-humans) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg) ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 
 ---
 
@@ -45,9 +45,50 @@ Countless hours went into vibe-coded wireframes, user experience design, and pol
 
 ## Quick Start
 
-1. Install from [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=concretio.markdown-for-humans)
-2. Open any `.md` file → Right-click → **"Open with Markdown for Humans"**
-3. Start writing!
+### Installation
+
+Choose your IDE below for installation instructions:
+
+<details open>
+<summary><b>VS Code</b></summary>
+
+**Option 1: Via Marketplace (Recommended)**
+1. Visit [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=concretio.markdown-for-humans)
+2. Click "Install"
+
+**Option 2: Within VS Code**
+1. Open Extensions (`Ctrl+Shift+X` / `Cmd+Shift+X`)
+2. Search for "Markdown for Humans" or use the extension ID: `concretio.markdown-for-humans`
+3. Click Install
+
+</details>
+
+<details>
+<summary><b>Cursor / Windsurf / VSCodium / Other Open VSX IDEs</b></summary>
+
+**Via Open VSX Registry:**
+1. Open Extensions panel
+2. Search for "Markdown for Humans" or use the extension ID: `concretio.markdown-for-humans`
+3. Install (automatically pulls from [Open VSX Registry](https://open-vsx.org/extension/concretio/markdown-for-humans))
+
+**Direct Link:** [Open VSX Registry](https://open-vsx.org/extension/concretio/markdown-for-humans)
+
+**Supported IDEs:**
+- [Cursor](https://cursor.sh/)
+- [Windsurf](https://codeium.com/windsurf)
+- [VSCodium](https://vscodium.com/)
+- [Gitpod](https://www.gitpod.io/)
+- [Eclipse Theia](https://theia-ide.org/)
+- Other Open VSX-compatible IDEs
+
+</details>
+
+> 💡 **Pro Tip:** For precise results, search using the extension ID `concretio.markdown-for-humans` in the Extensions panel of any IDE.
+
+### Usage
+
+1. Open any `.md` file → Right-click → **"Open with Markdown for Humans"**
+2. Start writing!
 
 **Toggle between WYSIWYG and source**: Click the `</>` Source button in the toolbar
 

@@ -1055,7 +1055,7 @@ npm run package
 # → Outputs markdown-for-humans-0.1.0.vsix in the project root
 
 # Publish to marketplace (requires publisher account)
-npm run publish
+vsce publish patch  # Auto-bumps version and publishes
 ```
 
 ### Build Configuration

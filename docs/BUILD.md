@@ -91,12 +91,62 @@ npm run package
 
 This creates a `.vsix` file (e.g., `markdown-for-humans-0.1.0.vsix`).
 
-### Publish to Marketplace
+### Publish to VS Code Marketplace
 
+**Recommended approach (auto-bumps version):**
 ```bash
-# Publish to VS Code Marketplace
-npm run publish
+# Login to marketplace (one-time per session)
+vsce login concretio
+
+# Choose version type and publish
+vsce publish patch  # Bug fixes: 0.1.0 → 0.1.1
+vsce publish minor  # New features: 0.1.1 → 0.2.0
+vsce publish major  # Breaking changes: 0.2.0 → 1.0.0
 ```
+
+**Manual version control:**
+```bash
+# Update version in package.json manually, then
+vsce publish
+```
+
+**Using npm script:**
+```bash
+npm run publish  # Runs: vsce publish (current version)
+```
+
+### Publish to Open VSX Registry (For Cursor, Windsurf, VSCodium & More)
+
+Open VSX is an open-source marketplace used by multiple VS Code-compatible editors.
+
+**Setup (one-time):**
+```bash
+# Install ovsx CLI globally
+npm install -g ovsx
+
+# Get personal access token from https://open-vsx.org/user-settings/tokens
+
+# Create namespace (first publish only)
+ovsx create-namespace concretio -p <your-token>
+```
+
+**Publish:**
+```bash
+# Publish current version (must already be built)
+ovsx publish -p <your-token>
+
+# Verify
+# https://open-vsx.org/extension/concretio/markdown-for-humans
+```
+
+**Result:** Extension becomes available in:
+- ✅ **VS Code** (from VS Code Marketplace)
+- ✅ **Cursor** (from Open VSX)
+- ✅ **Windsurf** (from Open VSX)
+- ✅ **VSCodium** (from Open VSX)
+- ✅ **Gitpod** (from Open VSX)
+- ✅ **Eclipse Theia** (from Open VSX)
+- ✅ **Other Open VSX-compatible IDEs**
 
 ## Build Architecture
 
@@ -531,12 +581,15 @@ Test these features manually:
 
 ### 4. Publish
 ```bash
-# Only if all tests pass
-npm run publish
+# Login to marketplace
+vsce login concretio
 
-# Create git tag
-git tag vX.Y.Z
-git push origin vX.Y.Z
+# Publish with automatic version bump (recommended)
+vsce publish patch  # or minor/major
+
+# AFTER publishing, create git tag
+git tag v$(node -p "require('./package.json').version")
+git push origin --tags
 ```
 
 ## CI/CD Integration
@@ -572,7 +625,9 @@ npm run test:coverage      # With coverage
 
 # Release
 npm run package            # Create .vsix
-npm run publish            # Publish to marketplace
+vsce publish patch         # Publish to VS Code Marketplace (auto-bumps version)
+ovsx publish -p <token>    # Publish to Open VSX (for Cursor & Windsurf)
+                          # First time: ovsx create-namespace concretio -p <token>
 
 # Debugging
 npm run build:webview -- --sourcemap  # Build with source maps
