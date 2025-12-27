@@ -31,13 +31,13 @@ jest.mock('vscode', () => ({
     file: jest.fn((p: string) => ({ fsPath: p, scheme: 'file' })),
   },
   TreeItem: class TreeItem {
-    public iconPath: any;
+    public iconPath: unknown;
     public description?: string;
-    public command?: any;
+    public command?: unknown;
     public contextValue?: string;
     constructor(
-      public label: any,
-      public collapsibleState?: any
+      public label: unknown,
+      public collapsibleState?: unknown
     ) {}
   },
   TreeItemCollapsibleState: {
@@ -48,7 +48,7 @@ jest.mock('vscode', () => ({
   ThemeIcon: class ThemeIcon {
     constructor(
       public id: string,
-      public color?: any
+      public color?: unknown
     ) {}
   },
   ThemeColor: class ThemeColor {
@@ -74,23 +74,19 @@ jest.mock('vscode', () => ({
   Position: jest.fn(),
 }));
 
-function createMockTextDocument(content: string): any {
+function createMockTextDocument(content: string): vscode.TextDocument {
   return {
     getText: jest.fn(() => content),
-    uri: {
-      scheme: 'file',
-      fsPath: '/workspace/docs/doc.md',
-      toString: () => 'file:/workspace/docs/doc.md',
-    },
+    uri: vscode.Uri.file('/workspace/docs/doc.md'),
     fileName: '/workspace/docs/doc.md',
     lineCount: content.split('\n').length,
-  };
+  } as unknown as vscode.TextDocument;
 }
 
 describe('MarkdownEditorProvider - Resize (in-place + workspace backups)', () => {
   let provider: MarkdownEditorProvider;
   let mockContext: vscode.ExtensionContext;
-  let mockWebview: any;
+  let mockWebview: { postMessage: jest.Mock };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -98,7 +94,7 @@ describe('MarkdownEditorProvider - Resize (in-place + workspace backups)', () =>
     jest.setSystemTime(new Date('2025-12-15T12:34:56.000Z'));
 
     mockContext = {
-      extensionUri: { fsPath: '/extension' } as any,
+      extensionUri: { fsPath: '/extension' } as vscode.Uri,
       subscriptions: [],
     } as unknown as vscode.ExtensionContext;
 
@@ -107,7 +103,9 @@ describe('MarkdownEditorProvider - Resize (in-place + workspace backups)', () =>
     };
 
     provider = new MarkdownEditorProvider(mockContext);
-    (vscode.workspace.workspaceFolders as any) = [{ uri: { fsPath: '/workspace' } }];
+    (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) = [
+      { uri: { fsPath: '/workspace' } as vscode.Uri } as vscode.WorkspaceFolder,
+    ];
   });
 
   afterEach(() => {
@@ -118,10 +116,10 @@ describe('MarkdownEditorProvider - Resize (in-place + workspace backups)', () =>
     const document = createMockTextDocument('# test');
 
     // Image exists
-    (vscode.workspace.fs.stat as jest.Mock).mockImplementation((uri: any) => {
+    (vscode.workspace.fs.stat as jest.Mock).mockImplementation((uri: vscode.Uri) => {
       // For image file check, resolve (file exists)
       if (uri.fsPath.includes('cat.png') && !uri.fsPath.includes('image-backups')) {
-        return Promise.resolve({} as any);
+        return Promise.resolve({} as vscode.FileStat);
       }
       // For backup collision detection, reject (file doesn't exist - no collision)
       return Promise.reject(new Error('File not found'));
@@ -141,7 +139,15 @@ describe('MarkdownEditorProvider - Resize (in-place + workspace backups)', () =>
       imageData: 'data:image/png;base64,AAAA',
     };
 
-    await (provider as any).handleResizeImage(message, document, mockWebview);
+    await (
+      provider as unknown as {
+        handleResizeImage: (
+          message: unknown,
+          doc: vscode.TextDocument,
+          webview: { postMessage: jest.Mock }
+        ) => Promise<void>;
+      }
+    ).handleResizeImage(message, document, mockWebview);
 
     // Backup write - flat structure (single directory)
     expect(vscode.workspace.fs.writeFile).toHaveBeenCalledWith(
@@ -170,7 +176,7 @@ describe('MarkdownEditorProvider - Resize (in-place + workspace backups)', () =>
     expect(vscode.workspace.fs.rename).not.toHaveBeenCalled();
 
     const resizedMessage = mockWebview.postMessage.mock.calls.find(
-      (call: any[]) => call[0]?.type === 'imageResized'
+      (call: unknown[]) => (call[0] as { type?: string })?.type === 'imageResized'
     )?.[0];
     expect(resizedMessage).toBeDefined();
     expect(resizedMessage.success).toBe(true);
@@ -183,15 +189,15 @@ describe('MarkdownEditorProvider - Resize (in-place + workspace backups)', () =>
     const document = createMockTextDocument('# test');
 
     // Image exists
-    (vscode.workspace.fs.stat as jest.Mock).mockImplementation((uri: any) => {
+    (vscode.workspace.fs.stat as jest.Mock).mockImplementation((uri: vscode.Uri) => {
       const path = uri.fsPath;
       // Image file exists
       if (path.includes('cat.png') && !path.includes('image-backups')) {
-        return Promise.resolve({} as any);
+        return Promise.resolve({} as vscode.FileStat);
       }
       // First backup path exists (collision)
       if (path.includes('original_cat_800x600px_20251215-123456.png') && !path.includes('-2')) {
-        return Promise.resolve({} as any);
+        return Promise.resolve({} as vscode.FileStat);
       }
       // -2 version doesn't exist (available)
       return Promise.reject(new Error('File not found'));
@@ -210,7 +216,15 @@ describe('MarkdownEditorProvider - Resize (in-place + workspace backups)', () =>
       imageData: 'data:image/png;base64,AAAA',
     };
 
-    await (provider as any).handleResizeImage(message, document, mockWebview);
+    await (
+      provider as unknown as {
+        handleResizeImage: (
+          message: unknown,
+          doc: vscode.TextDocument,
+          webview: { postMessage: jest.Mock }
+        ) => Promise<void>;
+      }
+    ).handleResizeImage(message, document, mockWebview);
 
     // Should write to -2 version due to collision
     expect(vscode.workspace.fs.writeFile).toHaveBeenCalledWith(
@@ -226,11 +240,11 @@ describe('MarkdownEditorProvider - Resize (in-place + workspace backups)', () =>
   it('creates backup for external image with _external suffix', async () => {
     const document = createMockTextDocument('# test');
 
-    (vscode.workspace.fs.stat as jest.Mock).mockImplementation((uri: any) => {
+    (vscode.workspace.fs.stat as jest.Mock).mockImplementation((uri: vscode.Uri) => {
       const path = uri.fsPath;
       // External image file exists
       if (path === '/Users/external/image.png') {
-        return Promise.resolve({} as any);
+        return Promise.resolve({} as vscode.FileStat);
       }
       // Backup doesn't exist
       return Promise.reject(new Error('File not found'));
@@ -250,7 +264,15 @@ describe('MarkdownEditorProvider - Resize (in-place + workspace backups)', () =>
       imageData: 'data:image/png;base64,AAAA',
     };
 
-    await (provider as any).handleResizeImage(message, document, mockWebview);
+    await (
+      provider as unknown as {
+        handleResizeImage: (
+          message: unknown,
+          doc: vscode.TextDocument,
+          webview: { postMessage: jest.Mock }
+        ) => Promise<void>;
+      }
+    ).handleResizeImage(message, document, mockWebview);
 
     // Should create backup in workspace with _external suffix
     expect(vscode.workspace.fs.writeFile).toHaveBeenCalledWith(
@@ -267,18 +289,18 @@ describe('MarkdownEditorProvider - Resize (in-place + workspace backups)', () =>
     const document = createMockTextDocument('# test');
 
     let callCount = 0;
-    (vscode.workspace.fs.stat as jest.Mock).mockImplementation((uri: any) => {
+    (vscode.workspace.fs.stat as jest.Mock).mockImplementation((uri: vscode.Uri) => {
       const path = uri.fsPath;
       // Image file exists
       if (path.includes('cat.png') && !path.includes('image-backups')) {
-        return Promise.resolve({} as any);
+        return Promise.resolve({} as vscode.FileStat);
       }
       // Simulate multiple backups already existing
       if (path.includes('image-backups')) {
         callCount++;
         // First 3 backup paths exist, 4th is available
         if (callCount <= 3) {
-          return Promise.resolve({} as any);
+          return Promise.resolve({} as vscode.FileStat);
         }
       }
       return Promise.reject(new Error('File not found'));
@@ -297,7 +319,15 @@ describe('MarkdownEditorProvider - Resize (in-place + workspace backups)', () =>
       imageData: 'data:image/png;base64,AAAA',
     };
 
-    await (provider as any).handleResizeImage(message, document, mockWebview);
+    await (
+      provider as unknown as {
+        handleResizeImage: (
+          message: unknown,
+          doc: vscode.TextDocument,
+          webview: { postMessage: jest.Mock }
+        ) => Promise<void>;
+      }
+    ).handleResizeImage(message, document, mockWebview);
 
     // Should write to -4 version (after checking -1, -2, -3)
     expect(vscode.workspace.fs.writeFile).toHaveBeenCalledWith(
@@ -313,10 +343,10 @@ describe('MarkdownEditorProvider - Resize (in-place + workspace backups)', () =>
   it('creates only single backup directory (not nested)', async () => {
     const document = createMockTextDocument('# test');
 
-    (vscode.workspace.fs.stat as jest.Mock).mockImplementation((uri: any) => {
+    (vscode.workspace.fs.stat as jest.Mock).mockImplementation((uri: vscode.Uri) => {
       const path = uri.fsPath;
       if (path.includes('cat.png') && !path.includes('image-backups')) {
-        return Promise.resolve({} as any);
+        return Promise.resolve({} as vscode.FileStat);
       }
       return Promise.reject(new Error('File not found'));
     });
@@ -334,7 +364,15 @@ describe('MarkdownEditorProvider - Resize (in-place + workspace backups)', () =>
       imageData: 'data:image/png;base64,AAAA',
     };
 
-    await (provider as any).handleResizeImage(message, document, mockWebview);
+    await (
+      provider as unknown as {
+        handleResizeImage: (
+          message: unknown,
+          doc: vscode.TextDocument,
+          webview: { postMessage: jest.Mock }
+        ) => Promise<void>;
+      }
+    ).handleResizeImage(message, document, mockWebview);
 
     // Should only create the single backup root directory
     expect(vscode.workspace.fs.createDirectory).toHaveBeenCalledTimes(1);

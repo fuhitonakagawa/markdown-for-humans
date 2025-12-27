@@ -75,16 +75,34 @@ describe('webview undo/redo guards', () => {
     jest.resetModules();
 
     // Minimal globals to satisfy editor.ts on import without creating the editor
-    (global as unknown as { document: { readyState: string; addEventListener: jest.Mock } }).document = {
+    (
+      global as unknown as { document: { readyState: string; addEventListener: jest.Mock } }
+    ).document = {
       readyState: 'loading',
       addEventListener: jest.fn(),
     };
-    (global as unknown as { window: { setTimeout: typeof setTimeout; clearTimeout: typeof clearTimeout; addEventListener: jest.Mock } }).window = {
+    (
+      global as unknown as {
+        window: {
+          setTimeout: typeof setTimeout;
+          clearTimeout: typeof clearTimeout;
+          addEventListener: jest.Mock;
+        };
+      }
+    ).window = {
       setTimeout,
       clearTimeout,
       addEventListener: jest.fn(),
     };
-    (global as unknown as { acquireVsCodeApi: () => { postMessage: jest.Mock; getState: jest.Mock; setState: jest.Mock } }).acquireVsCodeApi = jest.fn(() => ({
+    (
+      global as unknown as {
+        acquireVsCodeApi: () => {
+          postMessage: jest.Mock;
+          getState: jest.Mock;
+          setState: jest.Mock;
+        };
+      }
+    ).acquireVsCodeApi = jest.fn(() => ({
       postMessage: jest.fn(),
       getState: jest.fn(),
       setState: jest.fn(),

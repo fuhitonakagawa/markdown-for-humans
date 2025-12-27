@@ -31,7 +31,11 @@ jest.mock('vscode', () => ({
     file: jest.fn((p: string) => ({ fsPath: p, scheme: 'file' })),
   },
   TreeItem: class TreeItem {
-    public iconPath: vscode.Uri | { light: vscode.Uri; dark: vscode.Uri } | vscode.ThemeIcon | undefined;
+    public iconPath:
+      | vscode.Uri
+      | { light: vscode.Uri; dark: vscode.Uri }
+      | vscode.ThemeIcon
+      | undefined;
     public description?: string;
     public command?: vscode.Command;
     public contextValue?: string;
@@ -124,7 +128,15 @@ describe('MarkdownEditorProvider - Image reference lookup', () => {
       };
     });
 
-    (provider as unknown as { handleWebviewMessage: (message: { type: string; [key: string]: unknown }, doc: vscode.TextDocument, webview: vscode.Webview) => void }).handleWebviewMessage(
+    (
+      provider as unknown as {
+        handleWebviewMessage: (
+          message: { type: string; [key: string]: unknown },
+          doc: vscode.TextDocument,
+          webview: vscode.Webview
+        ) => void;
+      }
+    ).handleWebviewMessage(
       { type: 'getImageReferences', requestId: 'req-1', imagePath: './images/cat.png' },
       document as vscode.TextDocument,
       mockWebview as unknown as vscode.Webview
@@ -134,7 +146,9 @@ describe('MarkdownEditorProvider - Image reference lookup', () => {
     await new Promise<void>(resolve => setImmediate(() => resolve()));
 
     const response = mockWebview.postMessage.mock.calls.find(
-      (call: unknown[]) => (call[0] as { type?: string; requestId?: string })?.type === 'imageReferences' && (call[0] as { type?: string; requestId?: string })?.requestId === 'req-1'
+      (call: unknown[]) =>
+        (call[0] as { type?: string; requestId?: string })?.type === 'imageReferences' &&
+        (call[0] as { type?: string; requestId?: string })?.requestId === 'req-1'
     )?.[0];
 
     expect(response).toBeDefined();

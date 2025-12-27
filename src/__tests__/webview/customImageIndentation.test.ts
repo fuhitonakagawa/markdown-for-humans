@@ -14,10 +14,22 @@ describe('CustomImage indentation', () => {
       HTMLAttributes: { class: 'markdown-image' },
     });
 
-    const nodeViewFactoryRaw = (extension as unknown as { config?: { addNodeView?: () => (args: { node: unknown; HTMLAttributes: unknown; editor: unknown }) => { dom: HTMLElement } } }).config?.addNodeView?.();
+    const nodeViewFactoryRaw = (
+      extension as unknown as {
+        config?: {
+          addNodeView?: () => (args: {
+            node: unknown;
+            HTMLAttributes: unknown;
+            editor: unknown;
+          }) => { dom: HTMLElement };
+        };
+      }
+    ).config?.addNodeView?.();
     expect(typeof nodeViewFactoryRaw).toBe('function');
     if (!nodeViewFactoryRaw) throw new Error('nodeViewFactory is undefined');
-    const nodeViewFactory: (args: { node: unknown; HTMLAttributes: unknown; editor: unknown }) => { dom: HTMLElement } = nodeViewFactoryRaw;
+    const nodeViewFactory: (args: { node: unknown; HTMLAttributes: unknown; editor: unknown }) => {
+      dom: HTMLElement;
+    } = nodeViewFactoryRaw;
 
     const node = {
       attrs: {
@@ -44,10 +56,22 @@ describe('CustomImage indentation', () => {
       HTMLAttributes: { class: 'markdown-image' },
     });
 
-    const nodeViewFactoryRaw = (extension as unknown as { config?: { addNodeView?: () => (args: { node: unknown; HTMLAttributes: unknown; editor: unknown }) => { dom: HTMLElement } } }).config?.addNodeView?.();
+    const nodeViewFactoryRaw = (
+      extension as unknown as {
+        config?: {
+          addNodeView?: () => (args: {
+            node: unknown;
+            HTMLAttributes: unknown;
+            editor: unknown;
+          }) => { dom: HTMLElement };
+        };
+      }
+    ).config?.addNodeView?.();
     expect(typeof nodeViewFactoryRaw).toBe('function');
     if (!nodeViewFactoryRaw) throw new Error('nodeViewFactory is undefined');
-    const nodeViewFactory: (args: { node: unknown; HTMLAttributes: unknown; editor: unknown }) => { dom: HTMLElement } = nodeViewFactoryRaw;
+    const nodeViewFactory: (args: { node: unknown; HTMLAttributes: unknown; editor: unknown }) => {
+      dom: HTMLElement;
+    } = nodeViewFactoryRaw;
 
     const node = {
       attrs: {
@@ -68,18 +92,34 @@ describe('CustomImage indentation', () => {
   });
 
   it('adds a cache-busting query param when a timestamp exists for the markdown path', async () => {
-    (window as unknown as { _imageCacheBust?: Map<string, number> })._imageCacheBust = new Map([['./img.png', 123]]);
-    (window as unknown as { resolveImagePath?: jest.Mock<Promise<string>> }).resolveImagePath = jest.fn().mockResolvedValue('vscode-webview://test/img.png');
+    (window as unknown as { _imageCacheBust?: Map<string, number> })._imageCacheBust = new Map([
+      ['./img.png', 123],
+    ]);
+    (window as unknown as { resolveImagePath?: jest.Mock<Promise<string>> }).resolveImagePath = jest
+      .fn()
+      .mockResolvedValue('vscode-webview://test/img.png');
 
     const extension = CustomImage.configure({
       allowBase64: true,
       HTMLAttributes: { class: 'markdown-image' },
     });
 
-    const nodeViewFactoryRaw = (extension as unknown as { config?: { addNodeView?: () => (args: { node: unknown; HTMLAttributes: unknown; editor: unknown }) => { dom: HTMLElement } } }).config?.addNodeView?.();
+    const nodeViewFactoryRaw = (
+      extension as unknown as {
+        config?: {
+          addNodeView?: () => (args: {
+            node: unknown;
+            HTMLAttributes: unknown;
+            editor: unknown;
+          }) => { dom: HTMLElement };
+        };
+      }
+    ).config?.addNodeView?.();
     expect(typeof nodeViewFactoryRaw).toBe('function');
     if (!nodeViewFactoryRaw) throw new Error('nodeViewFactory is undefined');
-    const nodeViewFactory: (args: { node: unknown; HTMLAttributes: unknown; editor: unknown }) => { dom: HTMLElement } = nodeViewFactoryRaw;
+    const nodeViewFactory: (args: { node: unknown; HTMLAttributes: unknown; editor: unknown }) => {
+      dom: HTMLElement;
+    } = nodeViewFactoryRaw;
 
     const node = {
       attrs: {

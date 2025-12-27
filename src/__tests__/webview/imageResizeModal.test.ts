@@ -23,7 +23,8 @@ describe('imageResizeModal', () => {
   afterEach(() => {
     document.body.innerHTML = '';
     hideImageResizeModal();
-    (window as unknown as { _workspaceCheckCallbacks?: unknown })._workspaceCheckCallbacks = undefined;
+    (window as unknown as { _workspaceCheckCallbacks?: unknown })._workspaceCheckCallbacks =
+      undefined;
   });
 
   describe('isExternalImage', () => {
@@ -126,7 +127,8 @@ describe('imageResizeModal', () => {
 
       img.style.width = '110px';
       img.style.height = '70px';
-      (img as unknown as { _pendingResizeDataUrl?: string })._pendingResizeDataUrl = 'data:image/png;base64,AAA=';
+      (img as unknown as { _pendingResizeDataUrl?: string })._pendingResizeDataUrl =
+        'data:image/png;base64,AAA=';
       handleImageResized('backup-1.png', img);
 
       img.style.width = '100px';

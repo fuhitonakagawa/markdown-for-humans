@@ -25,8 +25,8 @@ jest.mock('vscode', () => ({
   },
   TreeItem: class TreeItem {
     constructor(
-      public label: any,
-      public collapsibleState?: any
+      public label: unknown,
+      public collapsibleState?: unknown
     ) {}
   },
   TreeItemCollapsibleState: {
@@ -37,7 +37,7 @@ jest.mock('vscode', () => ({
   ThemeIcon: class ThemeIcon {
     constructor(
       public id: string,
-      public color?: any
+      public color?: unknown
     ) {}
   },
   ThemeColor: class ThemeColor {
@@ -61,35 +61,39 @@ jest.mock('vscode', () => ({
   Position: jest.fn(),
 }));
 
-function createMockTextDocument(): any {
+function createMockTextDocument(): vscode.TextDocument {
   return {
     getText: jest.fn(() => ''),
-    uri: {
-      scheme: 'file',
-      fsPath: '/workspace/docs/doc.md',
-      toString: () => 'file:/workspace/docs/doc.md',
-    },
+    uri: vscode.Uri.file('/workspace/docs/doc.md'),
     fileName: '/workspace/docs/doc.md',
     lineCount: 1,
-  };
+  } as unknown as vscode.TextDocument;
 }
 
 describe('MarkdownEditorProvider - checkImageRename', () => {
   it('returns exists=true when the target filename already exists', async () => {
     const provider = new MarkdownEditorProvider({
-      extensionUri: { fsPath: '/extension' } as any,
+      extensionUri: { fsPath: '/extension' } as vscode.Uri,
       subscriptions: [],
-    } as any);
+    } as unknown as vscode.ExtensionContext);
     const document = createMockTextDocument();
     const mockWebview = { postMessage: jest.fn() };
 
-    (vscode.workspace.fs.stat as jest.Mock).mockImplementation(async (uri: any) => {
-      if (uri.fsPath.endsWith('/images/cat.png')) return {} as any;
-      if (uri.fsPath.endsWith('/images/dog.png')) return {} as any;
+    (vscode.workspace.fs.stat as jest.Mock).mockImplementation(async (uri: vscode.Uri) => {
+      if (uri.fsPath.endsWith('/images/cat.png')) return {} as vscode.FileStat;
+      if (uri.fsPath.endsWith('/images/dog.png')) return {} as vscode.FileStat;
       throw new Error(`Unexpected path: ${uri.fsPath}`);
     });
 
-    await (provider as any).handleCheckImageRename(
+    await (
+      provider as unknown as {
+        handleCheckImageRename: (
+          message: unknown,
+          doc: vscode.TextDocument,
+          webview: { postMessage: jest.Mock }
+        ) => Promise<void>;
+      }
+    ).handleCheckImageRename(
       { type: 'checkImageRename', requestId: 'req-1', oldPath: './images/cat.png', newName: 'dog' },
       document,
       mockWebview

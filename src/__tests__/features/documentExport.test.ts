@@ -13,7 +13,10 @@ import { EventEmitter } from 'events';
 // Mock external dependencies
 jest.mock('child_process', () => {
   const spawnMock = jest.fn(() => {
-    const proc = new EventEmitter() as any;
+    const proc = new EventEmitter() as unknown as {
+      kill: jest.Mock;
+      emit: (event: string, code: number) => boolean;
+    };
     proc.kill = jest.fn();
     // Simulate successful exit on next tick
     setImmediate(() => proc.emit('exit', 0));
@@ -55,8 +58,8 @@ jest.mock('fs', () => ({
 // The actual export functionality works correctly - this is a test infrastructure issue.
 // TODO: Investigate memory leak in mock setup or split into smaller test files.
 describe.skip('Document Export Integration', () => {
-  let mockEditor: any;
-  let mockDocument: any;
+  let mockEditor: vscode.TextEditor;
+  let mockDocument: vscode.TextDocument;
   let consoleErrorSpy: jest.SpyInstance;
 
   beforeEach(() => {
@@ -67,14 +70,15 @@ describe.skip('Document Export Integration', () => {
     mockDocument = {
       getText: jest.fn().mockReturnValue('# Test Document\n\nHello world'),
       fileName: '/test/doc.md',
-      uri: { fsPath: '/test/doc.md' },
-    };
+      uri: vscode.Uri.file('/test/doc.md'),
+    } as unknown as vscode.TextDocument;
 
     mockEditor = {
       document: mockDocument,
-    };
+    } as unknown as vscode.TextEditor;
 
-    (vscode.window.activeTextEditor as any) = mockEditor;
+    (vscode.window as unknown as { activeTextEditor?: vscode.TextEditor }).activeTextEditor =
+      mockEditor;
     (vscode.window.showSaveDialog as jest.Mock).mockResolvedValue({ fsPath: '/test/output.pdf' });
     (fs.existsSync as jest.Mock).mockReturnValue(true); // Mock Chrome exists
   });
@@ -176,8 +180,10 @@ describe.skip('Document Export Integration', () => {
     const spawnMock = childProcess.spawn as unknown as jest.Mock;
     let spawnCallCount = 0;
     spawnMock.mockImplementation(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const proc = new EventEmitter() as any;
+      const proc = new EventEmitter() as unknown as {
+        kill: jest.Mock;
+        emit: (event: string, code: number) => boolean;
+      };
       spawnCallCount++;
       if (spawnCallCount === 1) {
         // First call is validation (--version) - succeed
@@ -343,7 +349,10 @@ describe.skip('Document Export Integration', () => {
         // Mock spawn for --version check
         const spawnMock = childProcess.spawn as unknown as jest.Mock;
         spawnMock.mockImplementationOnce(() => {
-          const proc = new EventEmitter() as any;
+          const proc = new EventEmitter() as unknown as {
+            kill: jest.Mock;
+            emit: (event: string, code: number) => boolean;
+          };
           setImmediate(() => {
             proc.emit('exit', 0);
           });
@@ -375,7 +384,10 @@ describe.skip('Document Export Integration', () => {
         (fs.existsSync as jest.Mock).mockReturnValue(true);
         const spawnMock = childProcess.spawn as unknown as jest.Mock;
         spawnMock.mockImplementationOnce(() => {
-          const proc = new EventEmitter() as any;
+          const proc = new EventEmitter() as unknown as {
+            kill: jest.Mock;
+            emit: (event: string, code: number) => boolean;
+          };
           setImmediate(() => {
             proc.emit('exit', 1); // Failed exit code
           });
@@ -496,8 +508,10 @@ describe.skip('Document Export Integration', () => {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const spawnMock = require('child_process').spawn as jest.Mock;
       spawnMock.mockImplementation(() => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const proc = new EventEmitter() as any;
+        const proc = new EventEmitter() as unknown as {
+          kill: jest.Mock;
+          emit: (event: string, code: number) => boolean;
+        };
         setImmediate(() => proc.emit('exit', 0));
         return proc;
       });

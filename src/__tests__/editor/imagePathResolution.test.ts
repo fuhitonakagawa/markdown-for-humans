@@ -7,6 +7,7 @@
  */
 
 import { MarkdownEditorProvider, normalizeImagePath } from '../../editor/MarkdownEditorProvider';
+import * as vscode from 'vscode';
 import { Uri } from 'vscode';
 import { createMockTextDocument } from '../../__mocks__/vscode';
 
@@ -209,7 +210,7 @@ describe('normalizeImagePath', () => {
   describe('handleResolveImageUri integration', () => {
     const createMockWebview = () => {
       const postMessage = jest.fn();
-      const asWebviewUri = jest.fn((uri: any) => ({
+      const asWebviewUri = jest.fn((uri: Uri) => ({
         toString: () => `webview:${uri.fsPath}`,
       }));
       return { postMessage, asWebviewUri };
@@ -218,21 +219,29 @@ describe('normalizeImagePath', () => {
     const createProvider = () =>
       new MarkdownEditorProvider({
         extensionUri: Uri.file('/test/extension'),
-      } as any);
+      } as unknown as vscode.ExtensionContext);
 
     it('resolves and decodes workspace-relative image paths', () => {
       const provider = createProvider();
       const document = createMockTextDocument('');
       const webview = createMockWebview();
 
-      (provider as any).handleResolveImageUri(
+      (
+        provider as unknown as {
+          handleResolveImageUri: (
+            message: unknown,
+            doc: vscode.TextDocument,
+            webview: vscode.Webview
+          ) => void;
+        }
+      ).handleResolveImageUri(
         {
           type: 'resolveImageUri',
           requestId: 'req-1',
           relativePath: 'images/Hero%20Image.png',
         },
         document,
-        webview as any
+        webview as unknown as vscode.Webview
       );
 
       expect(webview.asWebviewUri).toHaveBeenCalledWith(
@@ -251,14 +260,22 @@ describe('normalizeImagePath', () => {
       const document = createMockTextDocument('');
       const webview = createMockWebview();
 
-      (provider as any).handleResolveImageUri(
+      (
+        provider as unknown as {
+          handleResolveImageUri: (
+            message: unknown,
+            doc: vscode.TextDocument,
+            webview: vscode.Webview
+          ) => void;
+        }
+      ).handleResolveImageUri(
         {
           type: 'resolveImageUri',
           requestId: 'req-2',
           relativePath: 'file:///test/assets/My%20Diagram.png',
         },
         document,
-        webview as any
+        webview as unknown as vscode.Webview
       );
 
       expect(webview.asWebviewUri).toHaveBeenCalledWith(

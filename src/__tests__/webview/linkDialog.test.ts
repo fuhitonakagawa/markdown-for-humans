@@ -35,7 +35,13 @@ const createMockEditor = (overrides: Record<string, unknown> = {}) => {
   };
 
   const makeTransaction = (doc: unknown) => {
-    const tr: { doc: unknown; removeMark: jest.Mock; insertText: jest.Mock; addMark: jest.Mock; setSelection: jest.Mock } = {
+    const tr: {
+      doc: unknown;
+      removeMark: jest.Mock;
+      insertText: jest.Mock;
+      addMark: jest.Mock;
+      setSelection: jest.Mock;
+    } = {
       doc,
       removeMark: jest.fn(() => tr),
       insertText: jest.fn(() => tr),
@@ -50,7 +56,12 @@ const createMockEditor = (overrides: Record<string, unknown> = {}) => {
     schema: { marks: { link: { create: jest.fn(attrs => ({ attrs })) } } },
     doc: defaultDoc,
     ...(overrides.state || {}),
-  } as unknown as { selection: unknown; schema: { marks: { link: { create: jest.Mock } } }; doc: unknown; tr?: unknown };
+  } as unknown as {
+    selection: unknown;
+    schema: { marks: { link: { create: jest.Mock } } };
+    doc: unknown;
+    tr?: unknown;
+  };
 
   if (!state.schema?.marks?.link?.create) {
     state.schema.marks.link = { create: jest.fn(attrs => ({ attrs })) };
@@ -60,10 +71,13 @@ const createMockEditor = (overrides: Record<string, unknown> = {}) => {
     (state.doc as { resolve: unknown }).resolve = defaultDoc.resolve;
   }
 
-  const tr = (overrides.state && (overrides.state as unknown as { tr?: unknown }).tr) || makeTransaction(state.doc);
+  const tr =
+    (overrides.state && (overrides.state as unknown as { tr?: unknown }).tr) ||
+    makeTransaction(state.doc);
   state.tr = tr;
 
-  const view = (overrides as unknown as { view?: { dispatch: jest.Mock; focus: jest.Mock } }).view || { dispatch: jest.fn(), focus: jest.fn() };
+  const view = (overrides as unknown as { view?: { dispatch: jest.Mock; focus: jest.Mock } })
+    .view || { dispatch: jest.fn(), focus: jest.fn() };
 
   // Cast as unknown then Editor since we're using a partial mock
   return {
@@ -139,17 +153,29 @@ describe('linkDialog', () => {
       focus: () => ChainType;
       extendMarkRange: () => ChainType;
       setLink: () => ChainType;
-      command: (cb: (args: { tr: { insertText: jest.Mock }; state: { selection: unknown; doc: unknown } }) => void) => ChainType;
+      command: (
+        cb: (args: {
+          tr: { insertText: jest.Mock };
+          state: { selection: unknown; doc: unknown };
+        }) => void
+      ) => ChainType;
       run: jest.Mock;
     };
     const chain: ChainType = {
       focus: jest.fn(() => chain),
       extendMarkRange: jest.fn(() => chain),
       setLink: jest.fn(() => chain),
-      command: jest.fn((cb: (args: { tr: { insertText: jest.Mock }; state: { selection: unknown; doc: unknown } }) => void) => {
-        cb({ tr: { insertText }, state: { selection, doc } });
-        return chain;
-      }),
+      command: jest.fn(
+        (
+          cb: (args: {
+            tr: { insertText: jest.Mock };
+            state: { selection: unknown; doc: unknown };
+          }) => void
+        ) => {
+          cb({ tr: { insertText }, state: { selection, doc } });
+          return chain;
+        }
+      ),
       run: jest.fn(),
     };
 
@@ -162,7 +188,7 @@ describe('linkDialog', () => {
     };
 
     const editor = createMockEditor({
-      state: { selection, schema: { marks: { link: {} } }, doc, tr },
+      state: { selection, schema: { marks: { link: { create: jest.fn() } } }, doc, tr } as unknown,
       chain: jest.fn(() => chain),
     });
 
