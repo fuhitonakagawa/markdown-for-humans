@@ -15,6 +15,8 @@ module.exports = {
         // Exclude files that depend heavily on VS Code API (tested via integration tests)
         '!src/extension.ts',
         '!src/editor/MarkdownEditorProvider.ts',
+        // Export pipeline depends on VS Code UI + external binaries (Chrome/Word); covered via manual/integration testing.
+        '!src/features/documentExport.ts',
         '!src/webview/**'
     ],
     coverageThreshold: {

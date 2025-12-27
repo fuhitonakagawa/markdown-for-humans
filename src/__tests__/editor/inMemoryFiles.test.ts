@@ -8,6 +8,7 @@
 
 import { MarkdownEditorProvider } from '../../editor/MarkdownEditorProvider';
 import * as vscode from 'vscode';
+import * as os from 'os';
 
 // Mock vscode module
 jest.mock('vscode', () => ({
@@ -184,7 +185,7 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
       (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue(null);
 
       const basePath = (provider as any).getImageBasePath(document);
-      expect(basePath).toBe(require('os').homedir());
+      expect(basePath).toBe(os.homedir());
     });
   });
 
@@ -230,7 +231,7 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
         {} as vscode.CancellationToken
       );
 
-      const homeDir = require('os').homedir();
+      const homeDir = os.homedir();
       expect(webviewPanel.webview.options.localResourceRoots).toContainEqual(
         expect.objectContaining({ fsPath: homeDir })
       );
@@ -531,7 +532,7 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
 
       await (provider as any).handleSaveImage(message, document, mockWebview);
 
-      const homeDir = require('os').homedir();
+      const homeDir = os.homedir();
       expect(vscode.workspace.fs.createDirectory).toHaveBeenCalledWith(
         expect.objectContaining({ fsPath: expect.stringContaining(homeDir) })
       );

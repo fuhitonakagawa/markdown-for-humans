@@ -447,7 +447,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
         // Trigger VS Code's save command
         vscode.commands.executeCommand('workbench.action.files.save');
         break;
-      case 'ready':
+      case 'ready': {
         // Webview is ready, send initial content and settings
         this.updateWebview(document, webview);
         // Also send settings separately
@@ -465,6 +465,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
           imagePathBase: imagePathBase,
         });
         break;
+      }
       case 'outlineUpdated': {
         const outline = (message.outline || []) as any[];
         outlineViewProvider.setOutline(outline as any);
@@ -619,7 +620,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
 
     // On Unix/Mac, path.relative() can produce paths starting with "/"
     // when paths don't share a common root. Check for leading slash.
-    const unixAbsolutePattern = /^\/[^\/]/;
+    const unixAbsolutePattern = /^\/[^/]/;
 
     // Also check if path.isAbsolute() returns true (Node.js built-in, cross-platform)
     return (

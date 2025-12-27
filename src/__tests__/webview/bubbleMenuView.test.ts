@@ -30,12 +30,12 @@ describe('BubbleMenuView', () => {
   let createTableMenu: (editor: Editor) => HTMLElement;
   let updateToolbarStates: () => void;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.resetModules();
     document.body.innerHTML = '';
 
     // Import after mocks are set up
-    const module = require('../../webview/BubbleMenuView');
+    const module = await import('../../webview/BubbleMenuView');
     createFormattingToolbar = module.createFormattingToolbar;
     createTableMenu = module.createTableMenu;
     updateToolbarStates = module.updateToolbarStates;

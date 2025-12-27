@@ -1137,7 +1137,7 @@ function updateEditorContent(markdown: string) {
     try {
       editor.commands.setTextSelection({ from, to });
       console.log(`[MD4H] Restored cursor position: ${from}-${to}`);
-    } catch (e) {
+    } catch {
       console.warn('[MD4H] Could not restore exact cursor position, using safe position');
       // If exact position fails, move to end of document
       const endPos = editor.state.doc.content.size;

@@ -64,7 +64,7 @@ jest.mock('./../../webview/utils/scrollToHeading', () => ({ scrollToHeading: jes
 describe('webview undo/redo guards', () => {
   let testing: any;
 
-  const setupModule = () => {
+  const setupModule = async () => {
     jest.resetModules();
 
     // Minimal globals to satisfy editor.ts on import without creating the editor
@@ -86,14 +86,12 @@ describe('webview undo/redo guards', () => {
       now: () => 0,
     };
 
-    jest.isolateModules(() => {
-      const mod = require('../../webview/editor');
-      testing = mod.__testing;
-    });
+    const mod = await import('../../webview/editor');
+    testing = mod.__testing;
   };
 
-  beforeEach(() => {
-    setupModule();
+  beforeEach(async () => {
+    await setupModule();
     testing.resetSyncState();
   });
 

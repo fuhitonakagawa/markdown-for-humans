@@ -5,12 +5,13 @@ import {
   validateChromePath,
   promptForChromePath,
 } from '../../features/documentExport';
+import * as childProcess from 'child_process';
+import * as docx from 'docx';
 import * as fs from 'fs';
 import { EventEmitter } from 'events';
 
 // Mock external dependencies
 jest.mock('child_process', () => {
-  const { EventEmitter } = require('events');
   const spawnMock = jest.fn(() => {
     const proc = new EventEmitter() as any;
     proc.kill = jest.fn();
@@ -97,7 +98,7 @@ describe.skip('Document Export Integration', () => {
 
     // Assert
     expect(vscode.window.withProgress).toHaveBeenCalled();
-    expect(require('child_process').spawn).toHaveBeenCalledWith(
+    expect(childProcess.spawn).toHaveBeenCalledWith(
       expect.any(String),
       expect.arrayContaining([
         expect.stringContaining('/test/output.pdf'),
@@ -120,7 +121,7 @@ describe.skip('Document Export Integration', () => {
 
     // Assert
     expect(vscode.window.withProgress).toHaveBeenCalled();
-    expect(require('docx').Packer.toBuffer).toHaveBeenCalled();
+    expect(docx.Packer.toBuffer).toHaveBeenCalled();
     expect(fs.writeFileSync).toHaveBeenCalledWith('/test/output.docx', expect.any(Buffer));
     expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
       expect.stringContaining('Document exported successfully')
@@ -135,7 +136,7 @@ describe.skip('Document Export Integration', () => {
     await exportDocument('pdf', '<h1>Content</h1>', [], 'Test Doc', mockDocument);
 
     // Assert
-    expect(require('child_process').spawn).not.toHaveBeenCalled();
+    expect(childProcess.spawn).not.toHaveBeenCalled();
     expect(fs.promises.writeFile).not.toHaveBeenCalled();
   });
 
@@ -160,7 +161,7 @@ describe.skip('Document Export Integration', () => {
       'Choose Chrome Path',
       'Cancel'
     );
-    expect(require('child_process').spawn).not.toHaveBeenCalled();
+    expect(childProcess.spawn).not.toHaveBeenCalled();
   });
 
   it('should handle export errors gracefully', async () => {
@@ -172,8 +173,7 @@ describe.skip('Document Export Integration', () => {
     });
     (fs.existsSync as jest.Mock).mockReturnValue(true);
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const spawnMock = require('child_process').spawn as jest.Mock;
+    const spawnMock = childProcess.spawn as unknown as jest.Mock;
     let spawnCallCount = 0;
     spawnMock.mockImplementation(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -220,7 +220,7 @@ describe.skip('Document Export Integration', () => {
       await exportDocument('pdf', '<h1>Content</h1>', [], 'Test Doc', mockDocument);
 
       // Assert
-      expect(require('child_process').spawn).toHaveBeenCalledWith(
+      expect(childProcess.spawn).toHaveBeenCalledWith(
         customPath,
         expect.any(Array),
         expect.any(Object)
@@ -244,7 +244,7 @@ describe.skip('Document Export Integration', () => {
       await exportDocument('pdf', '<h1>Content</h1>', [], 'Test Doc', mockDocument);
 
       // Assert
-      expect(require('child_process').spawn).toHaveBeenCalledWith(
+      expect(childProcess.spawn).toHaveBeenCalledWith(
         expect.stringContaining('chrome.exe'),
         expect.any(Array),
         expect.any(Object)
@@ -268,7 +268,7 @@ describe.skip('Document Export Integration', () => {
       await exportDocument('pdf', '<h1>Content</h1>', [], 'Test Doc', mockDocument);
 
       // Assert
-      expect(require('child_process').spawn).toHaveBeenCalledWith(
+      expect(childProcess.spawn).toHaveBeenCalledWith(
         '/usr/bin/google-chrome',
         expect.any(Array),
         expect.any(Object)
@@ -341,7 +341,7 @@ describe.skip('Document Export Integration', () => {
         (fs.existsSync as jest.Mock).mockReturnValue(true);
 
         // Mock spawn for --version check
-        const spawnMock = require('child_process').spawn as jest.Mock;
+        const spawnMock = childProcess.spawn as unknown as jest.Mock;
         spawnMock.mockImplementationOnce(() => {
           const proc = new EventEmitter() as any;
           setImmediate(() => {
@@ -373,7 +373,7 @@ describe.skip('Document Export Integration', () => {
       it('should return invalid if Chrome version check fails', async () => {
         // Arrange
         (fs.existsSync as jest.Mock).mockReturnValue(true);
-        const spawnMock = require('child_process').spawn as jest.Mock;
+        const spawnMock = childProcess.spawn as unknown as jest.Mock;
         spawnMock.mockImplementationOnce(() => {
           const proc = new EventEmitter() as any;
           setImmediate(() => {
@@ -561,7 +561,7 @@ describe.skip('Document Export Integration', () => {
       await exportDocument('pdf', '<h1>Content</h1>', [], 'Test Doc', mockDocument);
 
       // Assert
-      expect(require('child_process').spawn).not.toHaveBeenCalled();
+      expect(childProcess.spawn).not.toHaveBeenCalled();
       expect(vscode.window.showErrorMessage).not.toHaveBeenCalled(); // No error, just cancellation
     });
   });

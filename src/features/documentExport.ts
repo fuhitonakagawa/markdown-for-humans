@@ -644,9 +644,8 @@ async function exportToWord(
   progress.report({ message: 'Converting to Word format...', increment: 30 });
 
   try {
-    // Lazy-load via require so Jest can mock it in unit tests.
-
-    const docx = require('docx');
+    const docxModule = await import('docx');
+    const docx = (docxModule as any).default ?? docxModule;
 
     progress.report({ message: 'Building document...', increment: 30 });
 
@@ -832,8 +831,8 @@ async function htmlToDocx(
 
   // Parse HTML with Cheerio (proper DOM parser, handles nested tags)
   // Lazy-load to keep module init and test transforms lightweight.
-
-  const cheerio = require('cheerio') as { load: (markup: string) => any };
+  const cheerioModule = await import('cheerio');
+  const cheerio = (cheerioModule as any).default ?? cheerioModule;
   const $ = cheerio.load(html);
 
   // Select all block-level elements we care about, maintaining document order
@@ -970,7 +969,7 @@ async function parseParagraphChildren(
 
             if (resolvableSrc.startsWith('data:')) {
               // Data URL
-              const matches = resolvableSrc.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+              const matches = resolvableSrc.match(/^data:([A-Za-z+/-]+);base64,(.+)$/);
               if (matches && matches.length === 3) {
                 buffer = Buffer.from(matches[2], 'base64');
               }

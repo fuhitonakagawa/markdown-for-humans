@@ -62,7 +62,6 @@ describe('ImageEnterSpacing extension', () => {
   const schema = blockSchema;
 
   const createPlugin = (editor: any) => {
-    ImageEnterSpacing = require('../../webview/extensions/imageEnterSpacing').ImageEnterSpacing;
     const plugins = ImageEnterSpacing.config.addProseMirrorPlugins.call({ editor });
     return plugins[0];
   };
@@ -78,8 +77,9 @@ describe('ImageEnterSpacing extension', () => {
       ...overrides,
     }) as unknown as KeyboardEvent & { preventDefault: jest.Mock; stopPropagation: jest.Mock };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.resetModules();
+    ({ ImageEnterSpacing } = await import('../../webview/extensions/imageEnterSpacing'));
   });
 
   it('inserts paragraph after a selected image node', () => {
@@ -522,7 +522,6 @@ describe('ImageEnterSpacing - Real-world multi-image scenarios', () => {
   });
 
   const createPlugin = (editor: any) => {
-    ImageEnterSpacing = require('../../webview/extensions/imageEnterSpacing').ImageEnterSpacing;
     const plugins = ImageEnterSpacing.config.addProseMirrorPlugins.call({ editor });
     return plugins[0];
   };
@@ -557,8 +556,9 @@ describe('ImageEnterSpacing - Real-world multi-image scenarios', () => {
       target: null,
     }) as unknown as KeyboardEvent & { preventDefault: jest.Mock; stopPropagation: jest.Mock };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.resetModules();
+    ({ ImageEnterSpacing } = await import('../../webview/extensions/imageEnterSpacing'));
   });
 
   /**

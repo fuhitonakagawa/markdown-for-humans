@@ -9,10 +9,12 @@
 
 describe('Tab Indentation Extension', () => {
   let TabIndentation: any;
+  let nodeSelectionPrototype: object;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.resetModules();
-    TabIndentation = require('../../webview/extensions/tabIndentation').TabIndentation;
+    ({ NodeSelection: { prototype: nodeSelectionPrototype } } = await import('prosemirror-state'));
+    ({ TabIndentation } = await import('../../webview/extensions/tabIndentation'));
   });
 
   describe('Tab Key - Tables', () => {
@@ -206,7 +208,7 @@ describe('Tab Indentation Extension', () => {
       const mockEditor = {
         view: {
           state: {
-            selection: Object.create(require('prosemirror-state').NodeSelection.prototype),
+            selection: Object.create(nodeSelectionPrototype),
           },
         },
         isActive: jest.fn(() => false),
@@ -226,7 +228,7 @@ describe('Tab Indentation Extension', () => {
   describe('Shift+Tab Key - Images', () => {
     it('should outdent selected image by removing one tab from indent-prefix', () => {
       const updateAttributesMock = jest.fn();
-      const selection = Object.create(require('prosemirror-state').NodeSelection.prototype);
+      const selection = Object.create(nodeSelectionPrototype);
       selection.node = {
         type: { name: 'image' },
         attrs: { 'indent-prefix': '\t\t' },
