@@ -222,21 +222,3 @@ describe('Image Conversion for Export', () => {
     });
   });
 });
-
-/**
- * Debug helper: Log what the regex actually captures
- */
-describe('Debug: Image Regex Capture Groups', () => {
-  it('should show what each capture group contains', () => {
-    const html = '<img class="test" src="./images/test.png" alt="Test" width="100">';
-    const imgRegex = /<img([^>]*)src=["']([^"']+)["']([^>]*)>/gi;
-    const match = imgRegex.exec(html);
-
-    console.log('Full match:', match?.[0]);
-    console.log('Before src:', match?.[1]);
-    console.log('Src value:', match?.[2]);
-    console.log('After src:', match?.[3]);
-
-    expect(match).not.toBeNull();
-  });
-});

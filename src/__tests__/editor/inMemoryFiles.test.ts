@@ -10,6 +10,26 @@ import { MarkdownEditorProvider } from '../../editor/MarkdownEditorProvider';
 import * as vscode from 'vscode';
 import * as os from 'os';
 
+type UriLike = { fsPath: string; scheme: string };
+type MockTextDocument = {
+  getText: jest.Mock<string, []>;
+  languageId: string;
+  uri: vscode.Uri;
+  fileName: string;
+};
+
+function getUriFsPath(uri: unknown): string {
+  if (typeof uri !== 'object' || uri === null) return '';
+  const value = (uri as Partial<UriLike>).fsPath;
+  return typeof value === 'string' ? value : '';
+}
+
+function getUriScheme(uri: unknown): string {
+  if (typeof uri !== 'object' || uri === null) return 'file';
+  const value = (uri as Partial<UriLike>).scheme;
+  return typeof value === 'string' ? value : 'file';
+}
+
 // Mock vscode module
 jest.mock('vscode', () => ({
   commands: {
@@ -39,20 +59,24 @@ jest.mock('vscode', () => ({
   },
   Uri: {
     file: jest.fn((path: string) => ({ fsPath: path, scheme: 'file' })),
-    joinPath: jest.fn((base: any, ...paths: string[]) => {
-      const basePath = base?.fsPath ?? '';
+    joinPath: jest.fn((base: unknown, ...paths: string[]) => {
+      const basePath = getUriFsPath(base);
       const joined = [basePath, ...paths].filter(Boolean).join('/');
-      return { fsPath: joined, scheme: base?.scheme ?? 'file' };
+      return { fsPath: joined, scheme: getUriScheme(base) };
     }),
   },
   TreeItem: class TreeItem {
-    public iconPath: any;
+    public iconPath:
+      | vscode.Uri
+      | { light: vscode.Uri; dark: vscode.Uri }
+      | vscode.ThemeIcon
+      | undefined;
     public description?: string;
-    public command?: any;
+    public command?: vscode.Command;
     public contextValue?: string;
     constructor(
-      public label: any,
-      public collapsibleState?: any
+      public label: string | vscode.TreeItemLabel,
+      public collapsibleState?: vscode.TreeItemCollapsibleState
     ) {}
   },
   TreeItemCollapsibleState: {
@@ -63,7 +87,7 @@ jest.mock('vscode', () => ({
   ThemeIcon: class ThemeIcon {
     constructor(
       public id: string,
-      public color?: any
+      public color?: vscode.ThemeColor
     ) {}
   },
   ThemeColor: class ThemeColor {
@@ -85,11 +109,15 @@ jest.mock('vscode', () => ({
   },
 }));
 
-function createMockTextDocument(content: string, languageId = 'markdown'): any {
+function createMockTextDocument(content: string, languageId = 'markdown'): MockTextDocument {
   return {
     getText: jest.fn(() => content),
     languageId,
-    uri: { scheme: 'file', fsPath: '/test/document.md', toString: () => 'file:/test/document.md' },
+    uri: {
+      scheme: 'file',
+      fsPath: '/test/document.md',
+      toString: () => 'file:/test/document.md',
+    } as unknown as vscode.Uri,
     fileName: '/test/document.md',
   };
 }
@@ -97,7 +125,59 @@ function createMockTextDocument(content: string, languageId = 'markdown'): any {
 describe('MarkdownEditorProvider - In-Memory File Support', () => {
   let provider: MarkdownEditorProvider;
   let mockContext: vscode.ExtensionContext;
-  let mockWebview: any;
+  let mockWebview: {
+    postMessage: jest.Mock;
+    asWebviewUri: jest.Mock;
+    onDidReceiveMessage: jest.Mock;
+    options: Record<string, unknown>;
+  };
+
+  const getProviderInternals = () =>
+    provider as unknown as {
+      getDocumentDirectory: (doc: vscode.TextDocument) => string | null;
+      getImageBasePath: (doc: vscode.TextDocument) => string | null;
+      resolveCustomTextEditor: (
+        doc: vscode.TextDocument,
+        panel: vscode.WebviewPanel,
+        token: vscode.CancellationToken
+      ) => Promise<void>;
+      handleResolveImageUri: (
+        message: { type: string; relativePath: string; requestId: string },
+        doc: vscode.TextDocument,
+        webview: { postMessage: jest.Mock; asWebviewUri: jest.Mock }
+      ) => void;
+      handleSaveImage: (
+        message: {
+          type: string;
+          placeholderId: string;
+          name: string;
+          data: number[];
+          targetFolder?: string;
+        },
+        doc: vscode.TextDocument,
+        webview: { postMessage: jest.Mock }
+      ) => Promise<void>;
+      handleCopyLocalImageToWorkspace: (
+        message: {
+          type: string;
+          absolutePath: string;
+          placeholderId: string;
+          targetFolder?: string;
+        },
+        doc: vscode.TextDocument,
+        webview: { postMessage: jest.Mock }
+      ) => Promise<void>;
+      handleWorkspaceImage: (
+        message: { type: string; sourcePath: string; fileName: string; insertPosition: number },
+        doc: vscode.TextDocument,
+        webview: { postMessage: jest.Mock }
+      ) => void;
+      handleCheckImageInWorkspace: (
+        message: { type: string; imagePath: string; requestId: string },
+        doc: vscode.TextDocument,
+        webview: { postMessage: jest.Mock }
+      ) => Promise<void>;
+    };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -108,8 +188,8 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
 
     mockWebview = {
       postMessage: jest.fn(),
-      asWebviewUri: jest.fn((uri: any) => ({
-        toString: () => `vscode-webview://${uri.fsPath}`,
+      asWebviewUri: jest.fn((uri: unknown) => ({
+        toString: () => `vscode-webview://${getUriFsPath(uri)}`,
       })),
       onDidReceiveMessage: jest.fn(() => ({ dispose: jest.fn() })),
       options: {},
@@ -121,40 +201,62 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
   describe('getDocumentDirectory', () => {
     it('should return document directory for file scheme', () => {
       const document = createMockTextDocument('content');
-      document.uri = { scheme: 'file', fsPath: '/workspace/test.md' } as any;
-      const docDir = (provider as any).getDocumentDirectory(document);
+      document.uri = { scheme: 'file', fsPath: '/workspace/test.md' } as unknown as vscode.Uri;
+      const docDir = getProviderInternals().getDocumentDirectory(
+        document as unknown as vscode.TextDocument
+      );
       expect(docDir).toBe('/workspace');
     });
 
     it('should return workspace folder for untitled file in workspace', () => {
       const document = createMockTextDocument('content');
-      document.uri = { scheme: 'untitled', toString: () => 'untitled:Untitled-1' } as any;
-      (vscode.workspace.workspaceFolders as any) = [{ uri: { fsPath: '/workspace' } }];
+      document.uri = {
+        scheme: 'untitled',
+        toString: () => 'untitled:Untitled-1',
+      } as unknown as vscode.Uri;
+      (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) = [
+        { uri: { fsPath: '/workspace' } as vscode.Uri } as vscode.WorkspaceFolder,
+      ];
       (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue(null);
 
-      const docDir = (provider as any).getDocumentDirectory(document);
+      const docDir = getProviderInternals().getDocumentDirectory(
+        document as unknown as vscode.TextDocument
+      );
       expect(docDir).toBe('/workspace');
     });
 
     it('should return null for untitled file without workspace', () => {
       const document = createMockTextDocument('content');
-      document.uri = { scheme: 'untitled', toString: () => 'untitled:Untitled-1' } as any;
-      (vscode.workspace.workspaceFolders as any) = undefined;
+      document.uri = {
+        scheme: 'untitled',
+        toString: () => 'untitled:Untitled-1',
+      } as unknown as vscode.Uri;
+      (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) =
+        undefined;
       (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue(null);
 
-      const docDir = (provider as any).getDocumentDirectory(document);
+      const docDir = getProviderInternals().getDocumentDirectory(
+        document as unknown as vscode.TextDocument
+      );
       expect(docDir).toBeNull();
     });
 
     it('should prioritize workspaceFolders over getWorkspaceFolder for untitled files', () => {
       const document = createMockTextDocument('content');
-      document.uri = { scheme: 'untitled', toString: () => 'untitled:Untitled-1' } as any;
-      (vscode.workspace.workspaceFolders as any) = [{ uri: { fsPath: '/workspace' } }];
+      document.uri = {
+        scheme: 'untitled',
+        toString: () => 'untitled:Untitled-1',
+      } as unknown as vscode.Uri;
+      (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) = [
+        { uri: { fsPath: '/workspace' } as vscode.Uri } as vscode.WorkspaceFolder,
+      ];
       (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue({
         uri: { fsPath: '/wrong-workspace' },
       });
 
-      const docDir = (provider as any).getDocumentDirectory(document);
+      const docDir = getProviderInternals().getDocumentDirectory(
+        document as unknown as vscode.TextDocument
+      );
       // Should use workspaceFolders[0], not getWorkspaceFolder result
       expect(docDir).toBe('/workspace');
     });
@@ -163,28 +265,43 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
   describe('getImageBasePath', () => {
     it('should return document directory for file scheme', () => {
       const document = createMockTextDocument('content');
-      document.uri = { scheme: 'file', fsPath: '/workspace/test.md' } as any;
-      const basePath = (provider as any).getImageBasePath(document);
+      document.uri = { scheme: 'file', fsPath: '/workspace/test.md' } as unknown as vscode.Uri;
+      const basePath = getProviderInternals().getImageBasePath(
+        document as unknown as vscode.TextDocument
+      );
       expect(basePath).toBe('/workspace');
     });
 
     it('should return workspace folder for untitled file in workspace', () => {
       const document = createMockTextDocument('content');
-      document.uri = { scheme: 'untitled', toString: () => 'untitled:Untitled-1' } as any;
-      (vscode.workspace.workspaceFolders as any) = [{ uri: { fsPath: '/workspace' } }];
+      document.uri = {
+        scheme: 'untitled',
+        toString: () => 'untitled:Untitled-1',
+      } as unknown as vscode.Uri;
+      (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) = [
+        { uri: { fsPath: '/workspace' } as vscode.Uri } as vscode.WorkspaceFolder,
+      ];
       (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue(null);
 
-      const basePath = (provider as any).getImageBasePath(document);
+      const basePath = getProviderInternals().getImageBasePath(
+        document as unknown as vscode.TextDocument
+      );
       expect(basePath).toBe('/workspace');
     });
 
     it('should return home directory for untitled file without workspace', () => {
       const document = createMockTextDocument('content');
-      document.uri = { scheme: 'untitled', toString: () => 'untitled:Untitled-1' } as any;
-      (vscode.workspace.workspaceFolders as any) = undefined;
+      document.uri = {
+        scheme: 'untitled',
+        toString: () => 'untitled:Untitled-1',
+      } as unknown as vscode.Uri;
+      (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) =
+        undefined;
       (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue(null);
 
-      const basePath = (provider as any).getImageBasePath(document);
+      const basePath = getProviderInternals().getImageBasePath(
+        document as unknown as vscode.TextDocument
+      );
       expect(basePath).toBe(os.homedir());
     });
   });
@@ -192,20 +309,25 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
   describe('resolveCustomTextEditor - localResourceRoots', () => {
     it('should include workspace folder for untitled file in workspace', async () => {
       const document = createMockTextDocument('content');
-      document.uri = { scheme: 'untitled', toString: () => 'untitled:Untitled-1' } as any;
+      document.uri = {
+        scheme: 'untitled',
+        toString: () => 'untitled:Untitled-1',
+      } as unknown as vscode.Uri;
       const webviewPanel = {
-        webview: mockWebview,
+        webview: mockWebview as unknown as vscode.Webview,
         onDidChangeViewState: jest.fn(),
         onDidDispose: jest.fn(),
-      } as any;
+      } as unknown as vscode.WebviewPanel;
 
-      (vscode.workspace.workspaceFolders as any) = [{ uri: { fsPath: '/workspace' } }];
+      (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) = [
+        { uri: { fsPath: '/workspace' } as vscode.Uri } as vscode.WorkspaceFolder,
+      ];
       (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue(null);
 
-      await (provider as any).resolveCustomTextEditor(
-        document,
+      await getProviderInternals().resolveCustomTextEditor(
+        document as unknown as vscode.TextDocument,
         webviewPanel,
-        {} as vscode.CancellationToken
+        {} as unknown as vscode.CancellationToken
       );
 
       expect(webviewPanel.webview.options.localResourceRoots).toContainEqual(
@@ -215,20 +337,24 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
 
     it('should include home directory for untitled file without workspace', async () => {
       const document = createMockTextDocument('content');
-      document.uri = { scheme: 'untitled', toString: () => 'untitled:Untitled-1' } as any;
+      document.uri = {
+        scheme: 'untitled',
+        toString: () => 'untitled:Untitled-1',
+      } as unknown as vscode.Uri;
       const webviewPanel = {
-        webview: mockWebview,
+        webview: mockWebview as unknown as vscode.Webview,
         onDidChangeViewState: jest.fn(),
         onDidDispose: jest.fn(),
-      } as any;
+      } as unknown as vscode.WebviewPanel;
 
-      (vscode.workspace.workspaceFolders as any) = undefined;
+      (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) =
+        undefined;
       (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue(null);
 
-      await (provider as any).resolveCustomTextEditor(
-        document,
+      await getProviderInternals().resolveCustomTextEditor(
+        document as unknown as vscode.TextDocument,
         webviewPanel,
-        {} as vscode.CancellationToken
+        {} as unknown as vscode.CancellationToken
       );
 
       const homeDir = os.homedir();
@@ -239,20 +365,24 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
 
     it('should show warning dialog for untitled file without workspace', async () => {
       const document = createMockTextDocument('content');
-      document.uri = { scheme: 'untitled', toString: () => 'untitled:Untitled-1' } as any;
+      document.uri = {
+        scheme: 'untitled',
+        toString: () => 'untitled:Untitled-1',
+      } as unknown as vscode.Uri;
       const webviewPanel = {
-        webview: mockWebview,
+        webview: mockWebview as unknown as vscode.Webview,
         onDidChangeViewState: jest.fn(),
         onDidDispose: jest.fn(),
-      } as any;
+      } as unknown as vscode.WebviewPanel;
 
-      (vscode.workspace.workspaceFolders as any) = undefined;
+      (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) =
+        undefined;
       (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue(null);
 
-      await (provider as any).resolveCustomTextEditor(
-        document,
+      await getProviderInternals().resolveCustomTextEditor(
+        document as unknown as vscode.TextDocument,
         webviewPanel,
-        {} as vscode.CancellationToken
+        {} as unknown as vscode.CancellationToken
       );
 
       expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
@@ -262,20 +392,25 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
 
     it('should not show warning dialog for untitled file with workspace', async () => {
       const document = createMockTextDocument('content');
-      document.uri = { scheme: 'untitled', toString: () => 'untitled:Untitled-1' } as any;
+      document.uri = {
+        scheme: 'untitled',
+        toString: () => 'untitled:Untitled-1',
+      } as unknown as vscode.Uri;
       const webviewPanel = {
-        webview: mockWebview,
+        webview: mockWebview as unknown as vscode.Webview,
         onDidChangeViewState: jest.fn(),
         onDidDispose: jest.fn(),
-      } as any;
+      } as unknown as vscode.WebviewPanel;
 
-      (vscode.workspace.workspaceFolders as any) = [{ uri: { fsPath: '/workspace' } }];
+      (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) = [
+        { uri: { fsPath: '/workspace' } as vscode.Uri } as vscode.WorkspaceFolder,
+      ];
       (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue(null);
 
-      await (provider as any).resolveCustomTextEditor(
-        document,
+      await getProviderInternals().resolveCustomTextEditor(
+        document as unknown as vscode.TextDocument,
         webviewPanel,
-        {} as vscode.CancellationToken
+        {} as unknown as vscode.CancellationToken
       );
 
       expect(vscode.window.showInformationMessage).not.toHaveBeenCalled();
@@ -285,8 +420,13 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
   describe('handleResolveImageUri', () => {
     it('should resolve relative image path using workspace folder for untitled file in workspace', () => {
       const document = createMockTextDocument('content');
-      document.uri = { scheme: 'untitled', toString: () => 'untitled:Untitled-1' } as any;
-      (vscode.workspace.workspaceFolders as any) = [{ uri: { fsPath: '/workspace' } }];
+      document.uri = {
+        scheme: 'untitled',
+        toString: () => 'untitled:Untitled-1',
+      } as unknown as vscode.Uri;
+      (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) = [
+        { uri: { fsPath: '/workspace' } as vscode.Uri } as vscode.WorkspaceFolder,
+      ];
       (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue(null);
 
       const message = {
@@ -295,7 +435,11 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
         requestId: 'test-123',
       };
 
-      (provider as any).handleResolveImageUri(message, document, mockWebview);
+      getProviderInternals().handleResolveImageUri(
+        message,
+        document as unknown as vscode.TextDocument,
+        mockWebview
+      );
 
       expect(mockWebview.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -308,8 +452,12 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
 
     it('should resolve relative image path using home directory for untitled file without workspace', () => {
       const document = createMockTextDocument('content');
-      document.uri = { scheme: 'untitled', toString: () => 'untitled:Untitled-1' } as any;
-      (vscode.workspace.workspaceFolders as any) = undefined;
+      document.uri = {
+        scheme: 'untitled',
+        toString: () => 'untitled:Untitled-1',
+      } as unknown as vscode.Uri;
+      (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) =
+        undefined;
       (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue(null);
 
       const message = {
@@ -318,7 +466,11 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
         requestId: 'test-123',
       };
 
-      (provider as any).handleResolveImageUri(message, document, mockWebview);
+      getProviderInternals().handleResolveImageUri(
+        message,
+        document as unknown as vscode.TextDocument,
+        mockWebview
+      );
 
       expect(mockWebview.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -330,9 +482,12 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
 
     it('should handle error when no base path available', () => {
       const document = createMockTextDocument('content');
-      document.uri = { scheme: 'untitled', toString: () => 'untitled:Untitled-1' } as any;
+      document.uri = {
+        scheme: 'untitled',
+        toString: () => 'untitled:Untitled-1',
+      } as unknown as vscode.Uri;
       // Mock getImageBasePath to return null
-      jest.spyOn(provider as any, 'getImageBasePath').mockReturnValue(null);
+      jest.spyOn(getProviderInternals(), 'getImageBasePath').mockReturnValue(null);
 
       const message = {
         type: 'resolveImageUri',
@@ -340,7 +495,11 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
         requestId: 'test-123',
       };
 
-      (provider as any).handleResolveImageUri(message, document, mockWebview);
+      getProviderInternals().handleResolveImageUri(
+        message,
+        document as unknown as vscode.TextDocument,
+        mockWebview
+      );
 
       expect(mockWebview.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -360,9 +519,11 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
         scheme: 'file',
         fsPath: '/workspace/docs/document.md',
         toString: () => 'file:/workspace/docs/document.md',
-      } as any;
+      } as unknown as vscode.Uri;
 
-      (vscode.workspace.workspaceFolders as any) = [{ uri: { fsPath: '/workspace' } }];
+      (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) = [
+        { uri: { fsPath: '/workspace' } as vscode.Uri } as vscode.WorkspaceFolder,
+      ];
       (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue({
         uri: { fsPath: '/workspace' },
       });
@@ -386,7 +547,11 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
         targetFolder: 'images',
       };
 
-      await (provider as any).handleSaveImage(message, document, mockWebview);
+      await getProviderInternals().handleSaveImage(
+        message,
+        document as unknown as vscode.TextDocument,
+        mockWebview
+      );
 
       expect(vscode.workspace.fs.createDirectory).toHaveBeenCalledWith(
         expect.objectContaining({ fsPath: expect.stringContaining('/workspace/docs/images') })
@@ -405,9 +570,11 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
         scheme: 'file',
         fsPath: '/workspace/docs/document.md',
         toString: () => 'file:/workspace/docs/document.md',
-      } as any;
+      } as unknown as vscode.Uri;
 
-      (vscode.workspace.workspaceFolders as any) = [{ uri: { fsPath: '/workspace' } }];
+      (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) = [
+        { uri: { fsPath: '/workspace' } as vscode.Uri } as vscode.WorkspaceFolder,
+      ];
       (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue({
         uri: { fsPath: '/workspace' },
       });
@@ -431,7 +598,11 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
         targetFolder: 'images',
       };
 
-      await (provider as any).handleSaveImage(message, document, mockWebview);
+      await getProviderInternals().handleSaveImage(
+        message,
+        document as unknown as vscode.TextDocument,
+        mockWebview
+      );
 
       expect(vscode.workspace.fs.createDirectory).toHaveBeenCalledWith(
         expect.objectContaining({ fsPath: expect.stringContaining('/workspace/images') })
@@ -446,8 +617,13 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
 
     it('should save image to workspace folder for untitled file in workspace', async () => {
       const document = createMockTextDocument('content');
-      document.uri = { scheme: 'untitled', toString: () => 'untitled:Untitled-1' } as any;
-      (vscode.workspace.workspaceFolders as any) = [{ uri: { fsPath: '/workspace' } }];
+      document.uri = {
+        scheme: 'untitled',
+        toString: () => 'untitled:Untitled-1',
+      } as unknown as vscode.Uri;
+      (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) = [
+        { uri: { fsPath: '/workspace' } as vscode.Uri } as vscode.WorkspaceFolder,
+      ];
       (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue(null);
       (vscode.workspace.fs.createDirectory as jest.Mock).mockResolvedValue(undefined);
       (vscode.workspace.fs.stat as jest.Mock).mockRejectedValue(new Error('ENOENT'));
@@ -461,7 +637,11 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
         targetFolder: 'images',
       };
 
-      await (provider as any).handleSaveImage(message, document, mockWebview);
+      await getProviderInternals().handleSaveImage(
+        message,
+        document as unknown as vscode.TextDocument,
+        mockWebview
+      );
 
       expect(vscode.workspace.fs.createDirectory).toHaveBeenCalledWith(
         expect.objectContaining({ fsPath: expect.stringContaining('/workspace/images') })
@@ -476,19 +656,25 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
 
     it('should avoid overwriting an existing image by suffixing the filename', async () => {
       const document = createMockTextDocument('content');
-      document.uri = { scheme: 'untitled', toString: () => 'untitled:Untitled-1' } as any;
-      (vscode.workspace.workspaceFolders as any) = [{ uri: { fsPath: '/workspace' } }];
+      document.uri = {
+        scheme: 'untitled',
+        toString: () => 'untitled:Untitled-1',
+      } as unknown as vscode.Uri;
+      (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) = [
+        { uri: { fsPath: '/workspace' } as vscode.Uri } as vscode.WorkspaceFolder,
+      ];
       (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue(null);
       (vscode.workspace.fs.createDirectory as jest.Mock).mockResolvedValue(undefined);
       (vscode.workspace.fs.writeFile as jest.Mock).mockResolvedValue(undefined);
-      (vscode.workspace.fs.stat as jest.Mock).mockImplementation((uri: any) => {
-        if (uri.fsPath === '/workspace/images/test.jpg') {
-          return Promise.resolve({} as any);
+      (vscode.workspace.fs.stat as jest.Mock).mockImplementation((uri: unknown) => {
+        const fsPath = getUriFsPath(uri);
+        if (fsPath === '/workspace/images/test.jpg') {
+          return Promise.resolve({} as unknown as vscode.FileStat);
         }
-        if (uri.fsPath === '/workspace/images/test-2.jpg') {
+        if (fsPath === '/workspace/images/test-2.jpg') {
           return Promise.reject(new Error('ENOENT'));
         }
-        return Promise.reject(new Error(`Unexpected path: ${uri.fsPath}`));
+        return Promise.reject(new Error(`Unexpected path: ${fsPath}`));
       });
 
       const message = {
@@ -499,7 +685,11 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
         targetFolder: 'images',
       };
 
-      await (provider as any).handleSaveImage(message, document, mockWebview);
+      await getProviderInternals().handleSaveImage(
+        message,
+        document as unknown as vscode.TextDocument,
+        mockWebview
+      );
 
       expect(vscode.workspace.fs.writeFile).toHaveBeenCalledWith(
         expect.objectContaining({ fsPath: '/workspace/images/test-2.jpg' }),
@@ -515,8 +705,12 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
 
     it('should save image to home directory for untitled file without workspace', async () => {
       const document = createMockTextDocument('content');
-      document.uri = { scheme: 'untitled', toString: () => 'untitled:Untitled-1' } as any;
-      (vscode.workspace.workspaceFolders as any) = undefined;
+      document.uri = {
+        scheme: 'untitled',
+        toString: () => 'untitled:Untitled-1',
+      } as unknown as vscode.Uri;
+      (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) =
+        undefined;
       (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue(null);
       (vscode.workspace.fs.createDirectory as jest.Mock).mockResolvedValue(undefined);
       (vscode.workspace.fs.stat as jest.Mock).mockRejectedValue(new Error('ENOENT'));
@@ -530,7 +724,11 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
         targetFolder: 'images',
       };
 
-      await (provider as any).handleSaveImage(message, document, mockWebview);
+      await getProviderInternals().handleSaveImage(
+        message,
+        document as unknown as vscode.TextDocument,
+        mockWebview
+      );
 
       const homeDir = os.homedir();
       expect(vscode.workspace.fs.createDirectory).toHaveBeenCalledWith(
@@ -540,8 +738,11 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
 
     it('should show error when no base path available', async () => {
       const document = createMockTextDocument('content');
-      document.uri = { scheme: 'untitled', toString: () => 'untitled:Untitled-1' } as any;
-      jest.spyOn(provider as any, 'getImageBasePath').mockReturnValue(null);
+      document.uri = {
+        scheme: 'untitled',
+        toString: () => 'untitled:Untitled-1',
+      } as unknown as vscode.Uri;
+      jest.spyOn(getProviderInternals(), 'getImageBasePath').mockReturnValue(null);
 
       const message = {
         type: 'saveImage',
@@ -550,7 +751,11 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
         data: [1, 2, 3],
       };
 
-      await (provider as any).handleSaveImage(message, document, mockWebview);
+      await getProviderInternals().handleSaveImage(
+        message,
+        document as unknown as vscode.TextDocument,
+        mockWebview
+      );
 
       expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
         expect.stringContaining('Cannot save image')
@@ -571,9 +776,11 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
         scheme: 'file',
         fsPath: '/workspace/docs/document.md',
         toString: () => 'file:/workspace/docs/document.md',
-      } as any;
+      } as unknown as vscode.Uri;
 
-      (vscode.workspace.workspaceFolders as any) = [{ uri: { fsPath: '/workspace' } }];
+      (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) = [
+        { uri: { fsPath: '/workspace' } as vscode.Uri } as vscode.WorkspaceFolder,
+      ];
       (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue({
         uri: { fsPath: '/workspace' },
       });
@@ -597,7 +804,11 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
         targetFolder: 'images',
       };
 
-      await (provider as any).handleCopyLocalImageToWorkspace(message, document, mockWebview);
+      await getProviderInternals().handleCopyLocalImageToWorkspace(
+        message,
+        document as unknown as vscode.TextDocument,
+        mockWebview
+      );
 
       expect(vscode.workspace.fs.createDirectory).toHaveBeenCalledWith(
         expect.objectContaining({ fsPath: expect.stringContaining('/workspace/images') })
@@ -619,8 +830,13 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
   describe('handleWorkspaceImage', () => {
     it('should compute relative path from workspace folder for untitled file', () => {
       const document = createMockTextDocument('content');
-      document.uri = { scheme: 'untitled', toString: () => 'untitled:Untitled-1' } as any;
-      (vscode.workspace.workspaceFolders as any) = [{ uri: { fsPath: '/workspace' } }];
+      document.uri = {
+        scheme: 'untitled',
+        toString: () => 'untitled:Untitled-1',
+      } as unknown as vscode.Uri;
+      (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) = [
+        { uri: { fsPath: '/workspace' } as vscode.Uri } as vscode.WorkspaceFolder,
+      ];
       (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue(null);
 
       const message = {
@@ -630,7 +846,11 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
         insertPosition: 0,
       };
 
-      (provider as any).handleWorkspaceImage(message, document, mockWebview);
+      getProviderInternals().handleWorkspaceImage(
+        message,
+        document as unknown as vscode.TextDocument,
+        mockWebview
+      );
 
       expect(mockWebview.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -644,8 +864,13 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
   describe('Integration - Full workflow', () => {
     it('should handle complete image workflow for untitled file in workspace', async () => {
       const document = createMockTextDocument('content');
-      document.uri = { scheme: 'untitled', toString: () => 'untitled:Untitled-1' } as any;
-      (vscode.workspace.workspaceFolders as any) = [{ uri: { fsPath: '/workspace' } }];
+      document.uri = {
+        scheme: 'untitled',
+        toString: () => 'untitled:Untitled-1',
+      } as unknown as vscode.Uri;
+      (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) = [
+        { uri: { fsPath: '/workspace' } as vscode.Uri } as vscode.WorkspaceFolder,
+      ];
       (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue(null);
       (vscode.workspace.fs.createDirectory as jest.Mock).mockResolvedValue(undefined);
       (vscode.workspace.fs.writeFile as jest.Mock).mockResolvedValue(undefined);
@@ -653,7 +878,7 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
       // subsequent calls (e.g. workspace image check) should succeed.
       (vscode.workspace.fs.stat as jest.Mock)
         .mockRejectedValueOnce(new Error('ENOENT'))
-        .mockResolvedValue({} as any);
+        .mockResolvedValue({} as unknown as vscode.FileStat);
 
       // 1. Resolve image URI
       const resolveMessage = {
@@ -661,7 +886,11 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
         relativePath: './images/test.jpg',
         requestId: 'resolve-1',
       };
-      (provider as any).handleResolveImageUri(resolveMessage, document, mockWebview);
+      getProviderInternals().handleResolveImageUri(
+        resolveMessage,
+        document as unknown as vscode.TextDocument,
+        mockWebview
+      );
       expect(mockWebview.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'imageUriResolved' })
       );
@@ -674,7 +903,11 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
         data: [1, 2, 3],
         targetFolder: 'images',
       };
-      await (provider as any).handleSaveImage(saveMessage, document, mockWebview);
+      await getProviderInternals().handleSaveImage(
+        saveMessage,
+        document as unknown as vscode.TextDocument,
+        mockWebview
+      );
       expect(mockWebview.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'imageSaved' })
       );
@@ -685,7 +918,11 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
         imagePath: './images/test.jpg',
         requestId: 'check-1',
       };
-      await (provider as any).handleCheckImageInWorkspace(checkMessage, document, mockWebview);
+      await getProviderInternals().handleCheckImageInWorkspace(
+        checkMessage,
+        document as unknown as vscode.TextDocument,
+        mockWebview
+      );
       expect(mockWebview.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'imageWorkspaceCheck' })
       );

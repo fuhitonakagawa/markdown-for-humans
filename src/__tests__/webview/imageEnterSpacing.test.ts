@@ -67,7 +67,16 @@ describe('ImageEnterSpacing extension', () => {
   const schema = blockSchema;
 
   const createPlugin = (editor: { commands?: unknown }) => {
-    const addPlugins = (ImageEnterSpacing as unknown as { config?: { addProseMirrorPlugins?: (this: { editor: unknown }) => Array<{ props?: { handleKeyDown?: (view: EditorView, event: KeyboardEvent) => boolean }; spec?: { state?: { init?: (config: unknown, state: unknown) => unknown } } }> } }).config?.addProseMirrorPlugins;
+    const addPlugins = (
+      ImageEnterSpacing as unknown as {
+        config?: {
+          addProseMirrorPlugins?: (this: { editor: unknown }) => Array<{
+            props?: { handleKeyDown?: (view: EditorView, event: KeyboardEvent) => boolean };
+            spec?: { state?: { init?: (config: unknown, state: unknown) => unknown } };
+          }>;
+        };
+      }
+    ).config?.addProseMirrorPlugins;
     if (!addPlugins) throw new Error('addProseMirrorPlugins not found');
     const plugins = addPlugins.call({ editor });
     const plugin = plugins[0];
@@ -124,7 +133,8 @@ describe('ImageEnterSpacing extension', () => {
 
     const plugin = createPlugin({ commands: {} });
     const event = createEvent();
-    const handled = plugin.props?.handleKeyDown?.({ state, dispatch } as unknown as EditorView, event) ?? false;
+    const handled =
+      plugin.props?.handleKeyDown?.({ state, dispatch } as unknown as EditorView, event) ?? false;
 
     expect(handled).toBe(true);
     expect(event.preventDefault).toHaveBeenCalled();
@@ -175,7 +185,8 @@ describe('ImageEnterSpacing extension', () => {
 
     const plugin = createPlugin({ commands: {} });
     const event = createEvent();
-    const handled = plugin.props?.handleKeyDown?.({ state, dispatch } as unknown as EditorView, event) ?? false;
+    const handled =
+      plugin.props?.handleKeyDown?.({ state, dispatch } as unknown as EditorView, event) ?? false;
 
     expect(handled).toBe(false);
     expect(event.preventDefault).not.toHaveBeenCalled();
@@ -215,7 +226,8 @@ describe('ImageEnterSpacing extension', () => {
 
     const plugin = createPlugin({ commands: {} });
     const event = createEvent();
-    const handled = plugin.props?.handleKeyDown?.({ state, dispatch } as unknown as EditorView, event) ?? false;
+    const handled =
+      plugin.props?.handleKeyDown?.({ state, dispatch } as unknown as EditorView, event) ?? false;
 
     expect(handled).toBe(true);
     expect(event.preventDefault).toHaveBeenCalled();
@@ -264,7 +276,8 @@ describe('ImageEnterSpacing extension', () => {
 
     const plugin = createPlugin({ commands: {} });
     const event = createEvent();
-    const handled = plugin.props?.handleKeyDown?.({ state, dispatch } as unknown as EditorView, event) ?? false;
+    const handled =
+      plugin.props?.handleKeyDown?.({ state, dispatch } as unknown as EditorView, event) ?? false;
 
     expect(handled).toBe(true);
     expect(event.stopPropagation).toHaveBeenCalled();
@@ -291,7 +304,11 @@ describe('ImageEnterSpacing extension', () => {
 
     const plugin = createPlugin(editor);
     const event = createEvent({ key: 'ArrowRight' });
-    const handled = plugin.props?.handleKeyDown?.({ state, dispatch: jest.fn() } as unknown as EditorView, event) ?? false;
+    const handled =
+      plugin.props?.handleKeyDown?.(
+        { state, dispatch: jest.fn() } as unknown as EditorView,
+        event
+      ) ?? false;
 
     expect(editor.commands.setTextSelection).toHaveBeenCalledWith(7);
     expect(event.preventDefault).toHaveBeenCalled();
@@ -319,7 +336,11 @@ describe('ImageEnterSpacing extension', () => {
 
     const plugin = createPlugin(editor);
     const event = createEvent({ key: 'ArrowLeft' });
-    const handled = plugin.props?.handleKeyDown?.({ state, dispatch: jest.fn() } as unknown as EditorView, event) ?? false;
+    const handled =
+      plugin.props?.handleKeyDown?.(
+        { state, dispatch: jest.fn() } as unknown as EditorView,
+        event
+      ) ?? false;
 
     expect(editor.commands.setTextSelection).toHaveBeenCalledWith(5);
     expect(event.preventDefault).toHaveBeenCalled();
@@ -353,7 +374,8 @@ describe('ImageEnterSpacing extension', () => {
     const menuButton = document.createElement('button');
     menuButton.className = 'image-menu-button';
     const event = createEvent({ target: menuButton });
-    const handled = plugin.props?.handleKeyDown?.({ state } as unknown as EditorView, event) ?? false;
+    const handled =
+      plugin.props?.handleKeyDown?.({ state } as unknown as EditorView, event) ?? false;
 
     expect(handled).toBe(false);
     expect(event.preventDefault).not.toHaveBeenCalled();
@@ -382,7 +404,11 @@ describe('ImageEnterSpacing extension', () => {
       },
     } as unknown;
     const plugin = createPlugin({ commands: {} });
-    const pluginSpec = (plugin as unknown as { spec?: { state?: { init?: (config: unknown, state: unknown) => unknown } } }).spec;
+    const pluginSpec = (
+      plugin as unknown as {
+        spec?: { state?: { init?: (config: unknown, state: unknown) => unknown } };
+      }
+    ).spec;
     const pluginState =
       pluginSpec?.state?.init?.(undefined, { doc, selection, schema }) ??
       pluginSpec?.state?.init?.(undefined, { doc, selection }) ??
@@ -393,12 +419,14 @@ describe('ImageEnterSpacing extension', () => {
       (pluginState as unknown as { decorations?: { find: () => Array<Decoration> } })
         ?.decorations || pluginState;
     const decorationArray = (decorations as { find: () => Array<Decoration> }).find();
-    const classes = decorationArray.map((d: Decoration) => {
-      // Decoration.node(pos, end, { class: '...' }) stores attributes in spec
-      // The spec is the attributes object passed to Decoration.node()
-      const decoration = d as unknown as { spec?: Record<string, unknown> };
-      return decoration.spec?.class as string | undefined;
-    }).filter((c): c is string => c !== undefined);
+    const classes = decorationArray
+      .map((d: Decoration) => {
+        // Decoration.node(pos, end, { class: '...' }) stores attributes in spec
+        // The spec is the attributes object passed to Decoration.node()
+        const decoration = d as unknown as { spec?: Record<string, unknown> };
+        return decoration.spec?.class as string | undefined;
+      })
+      .filter((c): c is string => c !== undefined);
 
     expect(classes).toContain('image-caret-after');
     expect(classes).not.toContain('image-caret-before');
@@ -426,7 +454,11 @@ describe('ImageEnterSpacing extension', () => {
       },
     } as unknown;
     const plugin = createPlugin({ commands: {} });
-    const pluginSpec = (plugin as unknown as { spec?: { state?: { init?: (config: unknown, state: unknown) => unknown } } }).spec;
+    const pluginSpec = (
+      plugin as unknown as {
+        spec?: { state?: { init?: (config: unknown, state: unknown) => unknown } };
+      }
+    ).spec;
     const pluginState =
       pluginSpec?.state?.init?.(undefined, { doc, selection, schema }) ??
       pluginSpec?.state?.init?.(undefined, { doc, selection }) ??
@@ -437,12 +469,14 @@ describe('ImageEnterSpacing extension', () => {
       (pluginState as unknown as { decorations?: { find: () => Array<Decoration> } })
         ?.decorations || pluginState;
     const decorationArray = (decorations as { find: () => Array<Decoration> }).find();
-    const classes = decorationArray.map((d: Decoration) => {
-      // Decoration.node(pos, end, { class: '...' }) stores attributes in spec
-      // The spec is the attributes object passed to Decoration.node()
-      const decoration = d as unknown as { spec?: Record<string, unknown> };
-      return decoration.spec?.class as string | undefined;
-    }).filter((c): c is string => c !== undefined);
+    const classes = decorationArray
+      .map((d: Decoration) => {
+        // Decoration.node(pos, end, { class: '...' }) stores attributes in spec
+        // The spec is the attributes object passed to Decoration.node()
+        const decoration = d as unknown as { spec?: Record<string, unknown> };
+        return decoration.spec?.class as string | undefined;
+      })
+      .filter((c): c is string => c !== undefined);
 
     expect(classes).toContain('image-caret-before');
     expect(classes).not.toContain('image-caret-after');
@@ -469,14 +503,20 @@ describe('ImageEnterSpacing extension', () => {
 
     const selection = NodeSelection.create(doc, imagePos!);
     const plugin = createPlugin({ commands: {} });
-    const pluginSpec = (plugin as unknown as { spec?: { state?: { init?: (config: unknown, state: unknown) => unknown } } }).spec;
+    const pluginSpec = (
+      plugin as unknown as {
+        spec?: { state?: { init?: (config: unknown, state: unknown) => unknown } };
+      }
+    ).spec;
     const pluginState =
       pluginSpec?.state?.init?.(undefined, { doc, selection, schema }) ??
       pluginSpec?.state?.init?.(undefined, { doc, selection }) ??
       null;
 
     expect(pluginState).toBeTruthy();
-    const decorations = (pluginState as any)?.decorations || pluginState;
+    const decorations =
+      (pluginState as unknown as { decorations?: { find: () => Array<Decoration> } })
+        ?.decorations ?? (pluginState as unknown as { find: () => Array<Decoration> });
     const [decoration] = decorations.find();
     expect(decoration).toBeDefined();
     expect(decoration.to - decoration.from).toBe(imageNode.nodeSize);
@@ -552,7 +592,16 @@ describe('ImageEnterSpacing - Real-world multi-image scenarios', () => {
   });
 
   const createPlugin = (editor: { commands?: unknown }) => {
-    const addPlugins = (ImageEnterSpacing as unknown as { config?: { addProseMirrorPlugins?: (this: { editor: unknown }) => Array<{ props?: { handleKeyDown?: (view: EditorView, event: KeyboardEvent) => boolean }; spec?: { state?: { init?: (config: unknown, state: unknown) => unknown } } }> } }).config?.addProseMirrorPlugins;
+    const addPlugins = (
+      ImageEnterSpacing as unknown as {
+        config?: {
+          addProseMirrorPlugins?: (this: { editor: unknown }) => Array<{
+            props?: { handleKeyDown?: (view: EditorView, event: KeyboardEvent) => boolean };
+            spec?: { state?: { init?: (config: unknown, state: unknown) => unknown } };
+          }>;
+        };
+      }
+    ).config?.addProseMirrorPlugins;
     if (!addPlugins) throw new Error('addProseMirrorPlugins not found');
     const plugins = addPlugins.call({ editor });
     const plugin = plugins[0];
@@ -680,10 +729,8 @@ describe('ImageEnterSpacing - Real-world multi-image scenarios', () => {
       const plugin = createPlugin({ commands: {} });
       const event = createEnterEvent();
 
-      const handled = plugin.props?.handleKeyDown?.(
-        { state, dispatch } as unknown as EditorView,
-        event
-      ) ?? false;
+      const handled =
+        plugin.props?.handleKeyDown?.({ state, dispatch } as unknown as EditorView, event) ?? false;
 
       expect(handled).toBe(true);
       expect(event.preventDefault).toHaveBeenCalled();
@@ -710,10 +757,8 @@ describe('ImageEnterSpacing - Real-world multi-image scenarios', () => {
       const plugin = createPlugin({ commands: {} });
       const event = createEnterEvent();
 
-      const handled = plugin.props?.handleKeyDown?.(
-        { state, dispatch } as unknown as EditorView,
-        event
-      ) ?? false;
+      const handled =
+        plugin.props?.handleKeyDown?.({ state, dispatch } as unknown as EditorView, event) ?? false;
 
       expect(handled).toBe(true);
       expect(event.preventDefault).toHaveBeenCalled();
@@ -739,10 +784,8 @@ describe('ImageEnterSpacing - Real-world multi-image scenarios', () => {
       const plugin = createPlugin({ commands: {} });
       const event = createEnterEvent();
 
-      const handled = plugin.props?.handleKeyDown?.(
-        { state, dispatch } as unknown as EditorView,
-        event
-      ) ?? false;
+      const handled =
+        plugin.props?.handleKeyDown?.({ state, dispatch } as unknown as EditorView, event) ?? false;
 
       expect(handled).toBe(true);
       expect(event.preventDefault).toHaveBeenCalled();
@@ -768,10 +811,8 @@ describe('ImageEnterSpacing - Real-world multi-image scenarios', () => {
       const plugin = createPlugin({ commands: {} });
       const event = createEnterEvent();
 
-      const handled = plugin.props?.handleKeyDown?.(
-        { state, dispatch } as unknown as EditorView,
-        event
-      ) ?? false;
+      const handled =
+        plugin.props?.handleKeyDown?.({ state, dispatch } as unknown as EditorView, event) ?? false;
 
       expect(handled).toBe(true);
       expect(event.preventDefault).toHaveBeenCalled();
@@ -796,10 +837,8 @@ describe('ImageEnterSpacing - Real-world multi-image scenarios', () => {
       const plugin = createPlugin({ commands: {} });
       const event = createEnterEvent();
 
-      const handled = plugin.props?.handleKeyDown?.(
-        { state, dispatch } as unknown as EditorView,
-        event
-      ) ?? false;
+      const handled =
+        plugin.props?.handleKeyDown?.({ state, dispatch } as unknown as EditorView, event) ?? false;
 
       expect(handled).toBe(true);
       expect(event.preventDefault).toHaveBeenCalled();
@@ -828,10 +867,8 @@ describe('ImageEnterSpacing - Real-world multi-image scenarios', () => {
       const plugin = createPlugin({ commands: {} });
       const event = createDeleteEvent();
 
-      const handled = plugin.props?.handleKeyDown?.(
-        { state, dispatch } as unknown as EditorView,
-        event
-      ) ?? false;
+      const handled =
+        plugin.props?.handleKeyDown?.({ state, dispatch } as unknown as EditorView, event) ?? false;
 
       // First press should select the image (set pending delete)
       expect(handled).toBe(true);
@@ -859,10 +896,8 @@ describe('ImageEnterSpacing - Real-world multi-image scenarios', () => {
       const plugin = createPlugin({ commands: {} });
       const event = createDeleteEvent();
 
-      const handled = plugin.props?.handleKeyDown?.(
-        { state, dispatch } as unknown as EditorView,
-        event
-      ) ?? false;
+      const handled =
+        plugin.props?.handleKeyDown?.({ state, dispatch } as unknown as EditorView, event) ?? false;
 
       expect(handled).toBe(true);
       expect(event.preventDefault).toHaveBeenCalled();
@@ -890,10 +925,8 @@ describe('ImageEnterSpacing - Real-world multi-image scenarios', () => {
       const plugin = createPlugin({ commands: {} });
       const event = createBackspaceEvent();
 
-      const handled = plugin.props?.handleKeyDown?.(
-        { state, dispatch } as unknown as EditorView,
-        event
-      ) ?? false;
+      const handled =
+        plugin.props?.handleKeyDown?.({ state, dispatch } as unknown as EditorView, event) ?? false;
 
       // First press should select the image (set pending delete)
       expect(handled).toBe(true);
@@ -921,10 +954,8 @@ describe('ImageEnterSpacing - Real-world multi-image scenarios', () => {
       const plugin = createPlugin({ commands: {} });
       const event = createBackspaceEvent();
 
-      const handled = plugin.props?.handleKeyDown?.(
-        { state, dispatch } as unknown as EditorView,
-        event
-      ) ?? false;
+      const handled =
+        plugin.props?.handleKeyDown?.({ state, dispatch } as unknown as EditorView, event) ?? false;
 
       // First press should select the image (set pending delete)
       expect(handled).toBe(true);
@@ -952,10 +983,8 @@ describe('ImageEnterSpacing - Real-world multi-image scenarios', () => {
       const plugin = createPlugin({ commands: {} });
       const event = createBackspaceEvent();
 
-      const handled = plugin.props?.handleKeyDown?.(
-        { state, dispatch } as unknown as EditorView,
-        event
-      ) ?? false;
+      const handled =
+        plugin.props?.handleKeyDown?.({ state, dispatch } as unknown as EditorView, event) ?? false;
 
       expect(handled).toBe(true);
       expect(event.preventDefault).toHaveBeenCalled();
@@ -981,10 +1010,8 @@ describe('ImageEnterSpacing - Real-world multi-image scenarios', () => {
       const plugin = createPlugin({ commands: {} });
       const event = createBackspaceEvent();
 
-      const handled = plugin.props?.handleKeyDown?.(
-        { state, dispatch } as unknown as EditorView,
-        event
-      ) ?? false;
+      const handled =
+        plugin.props?.handleKeyDown?.({ state, dispatch } as unknown as EditorView, event) ?? false;
 
       expect(handled).toBe(true);
       expect(event.preventDefault).toHaveBeenCalled();
@@ -1014,7 +1041,9 @@ describe('ImageEnterSpacing - Real-world multi-image scenarios', () => {
 
       // First press - should select image and mark for deletion
       const event1 = createBackspaceEvent();
-      const handled1 = plugin.props?.handleKeyDown?.({ state, dispatch } as unknown as EditorView, event1) ?? false;
+      const handled1 =
+        plugin.props?.handleKeyDown?.({ state, dispatch } as unknown as EditorView, event1) ??
+        false;
 
       expect(handled1).toBe(true);
       expect(event1.preventDefault).toHaveBeenCalled();
@@ -1149,10 +1178,8 @@ describe('ImageEnterSpacing - Real-world multi-image scenarios', () => {
       const plugin = createPlugin({ commands: {} });
       const event = createEnterEvent();
 
-      const handled = plugin.props?.handleKeyDown?.(
-        { state, dispatch } as unknown as EditorView,
-        event
-      ) ?? false;
+      const handled =
+        plugin.props?.handleKeyDown?.({ state, dispatch } as unknown as EditorView, event) ?? false;
 
       // Test passes if Enter is handled and doesn't throw an error
       // The key regression test: Before the fix, cursor would jump to after the GitHub alert
