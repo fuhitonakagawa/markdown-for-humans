@@ -15,7 +15,7 @@ export function activate(context: vscode.ExtensionContext) {
   const provider = MarkdownEditorProvider.register(context);
   context.subscriptions.push(provider);
 
-  // Clear active context when switching to non-md-human editors
+  // Clear active context when switching to non-markdown-for-humans editors
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor(editor => {
       // Custom editors appear as undefined in activeTextEditor, so if we get a text editor here, disable context

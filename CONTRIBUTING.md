@@ -63,7 +63,7 @@ code --version   # Should be 1.85+
 ### 1. Clone and Install
 
 ```bash
-git clone https://github.com/concretios/md-human.git
+git clone https://github.com/concretios/markdown-for-humans.git
 cd markdown-for-humans
 npm install
 ```
