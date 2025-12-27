@@ -2,13 +2,20 @@
  * @jest-environment jsdom
  */
 
+import type { Editor } from '@tiptap/core';
 import { createFormattingToolbar, updateToolbarStates } from '../../webview/BubbleMenuView';
+
+type ChainProxy = {
+  run: () => boolean;
+  [key: string]: unknown;
+};
 
 const createMockEditor = () => {
   const run = jest.fn(() => true);
+  const isActive = jest.fn<boolean, [string, Record<string, unknown>?]>(() => false);
 
   const chainTarget: Record<string, unknown> = { run };
-  const chainProxy: any = new Proxy(chainTarget, {
+  const chainProxy = new Proxy(chainTarget, {
     get: (target, prop) => {
       if (prop === 'run') {
         return run;
@@ -21,15 +28,15 @@ const createMockEditor = () => {
 
       return target[prop as string];
     },
-  });
+  }) as ChainProxy;
 
-  const editor: any = {
+  const editor = {
     chain: () => chainProxy,
-    isActive: jest.fn(() => false),
+    isActive,
     on: jest.fn(),
-  };
+  } as unknown as Editor;
 
-  return { editor, isActive: editor.isActive, run };
+  return { editor, isActive, run };
 };
 
 describe('createFormattingToolbar', () => {

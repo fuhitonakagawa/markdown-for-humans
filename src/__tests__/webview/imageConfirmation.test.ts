@@ -68,35 +68,35 @@ describe('imageConfirmation', () => {
   });
 
   describe('getDefaultImagePath', () => {
-    const originalWindow = (global as any).window;
+    const originalWindow = (global as unknown as { window?: { imagePath?: string } }).window;
 
     beforeEach(() => {
       // Mock window object
-      (global as any).window = {};
+      (global as unknown as { window: { imagePath?: string } }).window = {};
     });
 
     afterEach(() => {
       // Restore original window
-      (global as any).window = originalWindow;
+      (global as unknown as { window?: { imagePath?: string } }).window = originalWindow;
     });
 
     it('should return imagePath from window if set', () => {
-      (global as any).window.imagePath = 'new-images';
+      (global as unknown as { window: { imagePath?: string } }).window.imagePath = 'new-images';
       expect(getDefaultImagePath()).toBe('new-images');
     });
 
     it('should fall back to images if window.imagePath is not set', () => {
-      (global as any).window.imagePath = undefined;
+      (global as unknown as { window: { imagePath?: string } }).window.imagePath = undefined;
       expect(getDefaultImagePath()).toBe('images');
     });
 
     it('should return empty string if window.imagePath is empty string', () => {
-      (global as any).window.imagePath = '';
+      (global as unknown as { window: { imagePath?: string } }).window.imagePath = '';
       expect(getDefaultImagePath()).toBe('');
     });
 
     it('should return custom path from settings', () => {
-      (global as any).window.imagePath = 'assets/img';
+      (global as unknown as { window: { imagePath?: string } }).window.imagePath = 'assets/img';
       expect(getDefaultImagePath()).toBe('assets/img');
     });
   });

@@ -133,10 +133,10 @@ describe('Mermaid TipTap extension markdown integration', () => {
     };
     const helpers = {
       renderChildren: jest.fn(() => 'sequenceDiagram\nA->>B: ping'),
-    };
-    const ctx = {} as any; // RenderContext mock
+    } as unknown as MarkdownRendererHelpers;
+    const ctx = {} as RenderContext;
 
-    const output = renderMarkdown(node as any, helpers as any, ctx);
+    const output = renderMarkdown(node as JSONContent, helpers, ctx);
 
     expect(output).toBe('```mermaid\nsequenceDiagram\nA->>B: ping\n```');
     expect(helpers.renderChildren).toHaveBeenCalledTimes(1);

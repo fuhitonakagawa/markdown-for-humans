@@ -40,7 +40,7 @@ describe('hugeImageDialog', () => {
         this.onload?.();
       }
     }
-    (global as any).Image = MockImage;
+    (global as typeof globalThis & { Image: typeof Image }).Image = MockImage as typeof Image;
 
     const file = new File([new Uint8Array(3 * 1024 * 1024)], 'big.png', { type: 'image/png' });
 

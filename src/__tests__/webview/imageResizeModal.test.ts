@@ -23,7 +23,7 @@ describe('imageResizeModal', () => {
   afterEach(() => {
     document.body.innerHTML = '';
     hideImageResizeModal();
-    (window as any)._workspaceCheckCallbacks = undefined;
+    (window as unknown as { _workspaceCheckCallbacks?: unknown })._workspaceCheckCallbacks = undefined;
   });
 
   describe('isExternalImage', () => {
@@ -126,13 +126,13 @@ describe('imageResizeModal', () => {
 
       img.style.width = '110px';
       img.style.height = '70px';
-      (img as any)._pendingResizeDataUrl = 'data:image/png;base64,AAA=';
+      (img as unknown as { _pendingResizeDataUrl?: string })._pendingResizeDataUrl = 'data:image/png;base64,AAA=';
       handleImageResized('backup-1.png', img);
 
       img.style.width = '100px';
       img.style.height = '60px';
       const resizedDataUrl = 'data:image/png;base64,BBB=';
-      (img as any)._pendingResizeDataUrl = resizedDataUrl;
+      (img as unknown as { _pendingResizeDataUrl?: string })._pendingResizeDataUrl = resizedDataUrl;
       handleImageResized('backup-2.png', img);
 
       const vscodeApi = { postMessage: jest.fn() };

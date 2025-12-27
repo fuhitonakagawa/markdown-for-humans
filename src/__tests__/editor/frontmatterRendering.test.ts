@@ -1,4 +1,4 @@
-import { WorkspaceEdit, Position, workspace } from 'vscode';
+import { WorkspaceEdit, Position, workspace, ExtensionContext, TextDocument } from 'vscode';
 import { MarkdownEditorProvider } from '../../editor/MarkdownEditorProvider';
 
 // Helper to create a minimal mock TextDocument
@@ -18,7 +18,7 @@ describe('MarkdownEditorProvider frontmatter rendering', () => {
   });
 
   it('wraps YAML frontmatter in a fenced code block when sending to webview', () => {
-    const provider = new MarkdownEditorProvider({} as any);
+    const provider = new MarkdownEditorProvider({} as ExtensionContext);
     const content = [
       '---',
       'title: Example',
@@ -32,7 +32,11 @@ describe('MarkdownEditorProvider frontmatter rendering', () => {
     const document = createDocument(content);
     const webview = { postMessage: jest.fn() };
 
-    (provider as any).updateWebview(document, webview);
+    (
+      provider as unknown as {
+        updateWebview: (doc: TextDocument, wv: { postMessage: jest.Mock }) => void;
+      }
+    ).updateWebview(document as unknown as TextDocument, webview);
 
     expect(webview.postMessage).toHaveBeenCalledTimes(1);
     const payload = (webview.postMessage as jest.Mock).mock.calls[0][0];
@@ -47,26 +51,32 @@ describe('MarkdownEditorProvider frontmatter rendering', () => {
   });
 
   it('restores YAML delimiters when saving an edited fenced block', async () => {
-    const provider = new MarkdownEditorProvider({} as any);
+    const provider = new MarkdownEditorProvider({} as ExtensionContext);
     const original = ['---', 'title: Old', '---', '', '# Heading'].join('\n');
-    const document: any = createDocument(original);
+    const document = createDocument(original) as unknown as TextDocument;
     const webview = { postMessage: jest.fn() };
 
     // Seed any internal caches via updateWebview
-    (provider as any).updateWebview(document, webview);
+    (
+      provider as unknown as {
+        updateWebview: (doc: TextDocument, wv: { postMessage: jest.Mock }) => void;
+      }
+    ).updateWebview(document, webview);
 
     const editedFenced = ['```yaml', '---', 'title: New', '---', '```', '', '# Heading'].join('\n');
 
     let savedText = '';
     (workspace.applyEdit as jest.Mock).mockImplementation(async (edit: WorkspaceEdit) => {
-      const replaces = (edit as any).replaces || [];
+      const replaces = (edit as unknown as { replaces?: Array<{ text: string }> }).replaces || [];
       if (replaces.length > 0) {
         savedText = replaces[0].text;
       }
       return true;
     });
 
-    await (provider as any).applyEdit(editedFenced, document);
+    await (
+      provider as unknown as { applyEdit: (content: string, doc: TextDocument) => Promise<void> }
+    ).applyEdit(editedFenced, document);
 
     expect(savedText.startsWith('---\ntitle: New')).toBe(true);
     expect(savedText).toContain('\n---\n\n# Heading');

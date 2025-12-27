@@ -206,7 +206,7 @@ describe('resolveBackupPathWithCollisionDetection', () => {
 
   it('appends -2 if original path exists', async () => {
     (vscode.workspace.fs.stat as jest.Mock)
-      .mockResolvedValueOnce({} as any) // First call: file exists
+      .mockResolvedValueOnce({} as vscode.FileStat) // First call: file exists
       .mockRejectedValueOnce(new Error('File not found')); // Second call: -2 version doesn't exist
 
     const result = await resolveBackupPathWithCollisionDetection(
@@ -219,8 +219,8 @@ describe('resolveBackupPathWithCollisionDetection', () => {
 
   it('appends -3 if -2 also exists', async () => {
     (vscode.workspace.fs.stat as jest.Mock)
-      .mockResolvedValueOnce({} as any) // Original exists
-      .mockResolvedValueOnce({} as any) // -2 exists
+      .mockResolvedValueOnce({} as vscode.FileStat) // Original exists
+      .mockResolvedValueOnce({} as vscode.FileStat) // -2 exists
       .mockRejectedValueOnce(new Error('File not found')); // -3 doesn't exist
 
     const result = await resolveBackupPathWithCollisionDetection(
@@ -243,7 +243,7 @@ describe('resolveBackupPathWithCollisionDetection', () => {
 
   it('handles collision for files without extension', async () => {
     (vscode.workspace.fs.stat as jest.Mock)
-      .mockResolvedValueOnce({} as any)
+      .mockResolvedValueOnce({} as vscode.FileStat)
       .mockRejectedValueOnce(new Error('File not found'));
 
     const result = await resolveBackupPathWithCollisionDetection(
@@ -255,10 +255,10 @@ describe('resolveBackupPathWithCollisionDetection', () => {
 
   it('handles multiple collisions sequentially', async () => {
     (vscode.workspace.fs.stat as jest.Mock)
-      .mockResolvedValueOnce({} as any) // Original exists
-      .mockResolvedValueOnce({} as any) // -2 exists
-      .mockResolvedValueOnce({} as any) // -3 exists
-      .mockResolvedValueOnce({} as any) // -4 exists
+      .mockResolvedValueOnce({} as vscode.FileStat) // Original exists
+      .mockResolvedValueOnce({} as vscode.FileStat) // -2 exists
+      .mockResolvedValueOnce({} as vscode.FileStat) // -3 exists
+      .mockResolvedValueOnce({} as vscode.FileStat) // -4 exists
       .mockRejectedValueOnce(new Error('File not found')); // -5 doesn't exist
 
     const result = await resolveBackupPathWithCollisionDetection(
@@ -271,7 +271,7 @@ describe('resolveBackupPathWithCollisionDetection', () => {
 
   it('handles files with multiple dots (path.extname returns last extension)', async () => {
     (vscode.workspace.fs.stat as jest.Mock)
-      .mockResolvedValueOnce({} as any)
+      .mockResolvedValueOnce({} as vscode.FileStat)
       .mockRejectedValueOnce(new Error('File not found'));
 
     const result = await resolveBackupPathWithCollisionDetection(

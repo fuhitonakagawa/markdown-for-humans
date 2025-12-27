@@ -8,6 +8,7 @@
  */
 
 describe('Tab Indentation Extension', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let TabIndentation: any;
   let nodeSelectionPrototype: object;
 

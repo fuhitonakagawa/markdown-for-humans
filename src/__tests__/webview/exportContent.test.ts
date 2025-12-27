@@ -5,10 +5,11 @@
  * for document export (PDF/Word).
  */
 
+import type { Editor } from '@tiptap/core';
 import { getDocumentTitle } from '../../webview/utils/exportContent';
 
 // Mock Editor instance with minimal interface
-const createMockEditor = (htmlContent: string) => {
+const createMockEditor = (htmlContent: string): Editor => {
   return {
     view: {
       dom: {
@@ -34,7 +35,7 @@ const createMockEditor = (htmlContent: string) => {
         },
       },
     },
-  } as any;
+  } as unknown as Editor;
 };
 
 describe('getDocumentTitle', () => {

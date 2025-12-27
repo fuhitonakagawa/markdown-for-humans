@@ -31,13 +31,13 @@ jest.mock('vscode', () => ({
     file: jest.fn((p: string) => ({ fsPath: p, scheme: 'file' })),
   },
   TreeItem: class TreeItem {
-    public iconPath: any;
+    public iconPath: vscode.Uri | { light: vscode.Uri; dark: vscode.Uri } | vscode.ThemeIcon | undefined;
     public description?: string;
-    public command?: any;
+    public command?: vscode.Command;
     public contextValue?: string;
     constructor(
-      public label: any,
-      public collapsibleState?: any
+      public label: string | vscode.TreeItemLabel,
+      public collapsibleState?: vscode.TreeItemCollapsibleState
     ) {}
   },
   TreeItemCollapsibleState: {
@@ -48,7 +48,7 @@ jest.mock('vscode', () => ({
   ThemeIcon: class ThemeIcon {
     constructor(
       public id: string,
-      public color?: any
+      public color?: vscode.ThemeColor
     ) {}
   },
   ThemeColor: class ThemeColor {
@@ -71,14 +71,14 @@ jest.mock('vscode', () => ({
   Position: jest.fn(),
 }));
 
-function createMockTextDocument(content: string): any {
+function createMockTextDocument(content: string): Partial<vscode.TextDocument> {
   return {
     getText: jest.fn(() => content),
     uri: {
       scheme: 'file',
       fsPath: '/workspace/docs/doc.md',
       toString: () => 'file:/workspace/docs/doc.md',
-    },
+    } as vscode.Uri,
     fileName: '/workspace/docs/doc.md',
     lineCount: content.split('\n').length,
   };
@@ -86,14 +86,14 @@ function createMockTextDocument(content: string): any {
 
 describe('MarkdownEditorProvider - Image reference lookup', () => {
   let provider: MarkdownEditorProvider;
-  let mockWebview: any;
+  let mockWebview: { postMessage: jest.Mock };
 
   beforeEach(() => {
     jest.clearAllMocks();
     provider = new MarkdownEditorProvider({
-      extensionUri: { fsPath: '/extension' } as any,
+      extensionUri: { fsPath: '/extension' } as vscode.Uri,
       subscriptions: [],
-    } as any);
+    } as unknown as vscode.ExtensionContext);
     mockWebview = { postMessage: jest.fn() };
   });
 
@@ -109,13 +109,13 @@ describe('MarkdownEditorProvider - Image reference lookup', () => {
     ];
 
     const fileContents = new Map<string, string>([
-      ['/workspace/docs/doc.md', document.getText()],
+      ['/workspace/docs/doc.md', (document.getText as jest.Mock)?.() ?? ''],
       ['/workspace/docs/other.md', '![X](./images/cat.png)'],
       ['/workspace/README.md', '![X](docs/images/cat.png)'],
     ]);
 
     (vscode.workspace.findFiles as jest.Mock).mockResolvedValue(files);
-    (vscode.workspace.openTextDocument as jest.Mock).mockImplementation(async (uri: any) => {
+    (vscode.workspace.openTextDocument as jest.Mock).mockImplementation(async (uri: vscode.Uri) => {
       const text = fileContents.get(uri.fsPath) ?? '';
       return {
         uri,
@@ -124,17 +124,17 @@ describe('MarkdownEditorProvider - Image reference lookup', () => {
       };
     });
 
-    (provider as any).handleWebviewMessage(
+    (provider as unknown as { handleWebviewMessage: (message: { type: string; [key: string]: unknown }, doc: vscode.TextDocument, webview: vscode.Webview) => void }).handleWebviewMessage(
       { type: 'getImageReferences', requestId: 'req-1', imagePath: './images/cat.png' },
-      document,
-      mockWebview
+      document as vscode.TextDocument,
+      mockWebview as unknown as vscode.Webview
     );
 
     // Let the async handler run
     await new Promise<void>(resolve => setImmediate(() => resolve()));
 
     const response = mockWebview.postMessage.mock.calls.find(
-      (call: any[]) => call[0]?.type === 'imageReferences' && call[0]?.requestId === 'req-1'
+      (call: unknown[]) => (call[0] as { type?: string; requestId?: string })?.type === 'imageReferences' && (call[0] as { type?: string; requestId?: string })?.requestId === 'req-1'
     )?.[0];
 
     expect(response).toBeDefined();

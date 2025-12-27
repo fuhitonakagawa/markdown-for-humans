@@ -4,8 +4,8 @@ import { CustomImage } from '../../webview/extensions/customImage';
 
 describe('CustomImage indentation', () => {
   beforeEach(() => {
-    delete (window as any).resolveImagePath;
-    delete (window as any)._imageCacheBust;
+    delete (window as unknown as { resolveImagePath?: unknown }).resolveImagePath;
+    delete (window as unknown as { _imageCacheBust?: unknown })._imageCacheBust;
   });
 
   it('applies indentation styles based on indent-prefix attr', () => {
@@ -14,8 +14,10 @@ describe('CustomImage indentation', () => {
       HTMLAttributes: { class: 'markdown-image' },
     });
 
-    const nodeViewFactory = (extension as any).config?.addNodeView?.();
-    expect(typeof nodeViewFactory).toBe('function');
+    const nodeViewFactoryRaw = (extension as unknown as { config?: { addNodeView?: () => (args: { node: unknown; HTMLAttributes: unknown; editor: unknown }) => { dom: HTMLElement } } }).config?.addNodeView?.();
+    expect(typeof nodeViewFactoryRaw).toBe('function');
+    if (!nodeViewFactoryRaw) throw new Error('nodeViewFactory is undefined');
+    const nodeViewFactory: (args: { node: unknown; HTMLAttributes: unknown; editor: unknown }) => { dom: HTMLElement } = nodeViewFactoryRaw;
 
     const node = {
       attrs: {
@@ -31,7 +33,7 @@ describe('CustomImage indentation', () => {
       editor: {},
     });
 
-    const wrapper = nodeView.dom as HTMLElement;
+    const wrapper = nodeView.dom;
     expect(wrapper.style.marginLeft).toBe('30px');
     expect(wrapper.style.maxWidth).toBe('calc(100% - 30px)');
   });
@@ -42,8 +44,10 @@ describe('CustomImage indentation', () => {
       HTMLAttributes: { class: 'markdown-image' },
     });
 
-    const nodeViewFactory = (extension as any).config?.addNodeView?.();
-    expect(typeof nodeViewFactory).toBe('function');
+    const nodeViewFactoryRaw = (extension as unknown as { config?: { addNodeView?: () => (args: { node: unknown; HTMLAttributes: unknown; editor: unknown }) => { dom: HTMLElement } } }).config?.addNodeView?.();
+    expect(typeof nodeViewFactoryRaw).toBe('function');
+    if (!nodeViewFactoryRaw) throw new Error('nodeViewFactory is undefined');
+    const nodeViewFactory: (args: { node: unknown; HTMLAttributes: unknown; editor: unknown }) => { dom: HTMLElement } = nodeViewFactoryRaw;
 
     const node = {
       attrs: {
@@ -58,22 +62,24 @@ describe('CustomImage indentation', () => {
       editor: {},
     });
 
-    const wrapper = nodeView.dom as HTMLElement;
+    const wrapper = nodeView.dom;
     expect(wrapper.style.marginLeft).toBe('');
     expect(wrapper.style.maxWidth).toBe('');
   });
 
   it('adds a cache-busting query param when a timestamp exists for the markdown path', async () => {
-    (window as any)._imageCacheBust = new Map([['./img.png', 123]]);
-    (window as any).resolveImagePath = jest.fn().mockResolvedValue('vscode-webview://test/img.png');
+    (window as unknown as { _imageCacheBust?: Map<string, number> })._imageCacheBust = new Map([['./img.png', 123]]);
+    (window as unknown as { resolveImagePath?: jest.Mock<Promise<string>> }).resolveImagePath = jest.fn().mockResolvedValue('vscode-webview://test/img.png');
 
     const extension = CustomImage.configure({
       allowBase64: true,
       HTMLAttributes: { class: 'markdown-image' },
     });
 
-    const nodeViewFactory = (extension as any).config?.addNodeView?.();
-    expect(typeof nodeViewFactory).toBe('function');
+    const nodeViewFactoryRaw = (extension as unknown as { config?: { addNodeView?: () => (args: { node: unknown; HTMLAttributes: unknown; editor: unknown }) => { dom: HTMLElement } } }).config?.addNodeView?.();
+    expect(typeof nodeViewFactoryRaw).toBe('function');
+    if (!nodeViewFactoryRaw) throw new Error('nodeViewFactory is undefined');
+    const nodeViewFactory: (args: { node: unknown; HTMLAttributes: unknown; editor: unknown }) => { dom: HTMLElement } = nodeViewFactoryRaw;
 
     const node = {
       attrs: {
@@ -88,7 +94,7 @@ describe('CustomImage indentation', () => {
       editor: {},
     });
 
-    const wrapper = nodeView.dom as HTMLElement;
+    const wrapper = nodeView.dom;
     const img = wrapper.querySelector('img') as HTMLImageElement | null;
     expect(img).not.toBeNull();
 

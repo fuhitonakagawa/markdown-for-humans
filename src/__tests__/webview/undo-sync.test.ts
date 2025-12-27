@@ -8,7 +8,7 @@
 // Mock TipTap and related heavy dependencies to avoid DOM requirements
 jest.mock('@tiptap/core', () => ({
   Editor: jest.fn(),
-  Extension: { create: (config: any) => config },
+  Extension: { create: (config: unknown) => config },
 }));
 jest.mock('@tiptap/starter-kit', () => ({ __esModule: true, default: { configure: () => ({}) } }));
 jest.mock('@tiptap/markdown', () => ({ Markdown: { configure: () => ({}) } }));
@@ -20,7 +20,7 @@ jest.mock('@tiptap/extension-table', () => ({
 jest.mock('@tiptap/extension-list', () => ({
   __esModule: true,
   ListKit: { configure: () => ({}) },
-  OrderedList: { extend: (config: any) => config },
+  OrderedList: { extend: (config: unknown) => config },
 }));
 jest.mock('@tiptap/extension-link', () => ({
   __esModule: true,
@@ -61,28 +61,35 @@ jest.mock('./../../webview/utils/copyMarkdown', () => ({ copySelectionAsMarkdown
 jest.mock('./../../webview/utils/outline', () => ({ buildOutlineFromEditor: jest.fn(() => []) }));
 jest.mock('./../../webview/utils/scrollToHeading', () => ({ scrollToHeading: jest.fn() }));
 
+type TestingModule = {
+  resetSyncState: () => void;
+  setMockEditor: (editor: unknown) => void;
+  trackSentContentForTests: (content: string) => void;
+  updateEditorContentForTests: (content: string) => void;
+};
+
 describe('webview undo/redo guards', () => {
-  let testing: any;
+  let testing: TestingModule;
 
   const setupModule = async () => {
     jest.resetModules();
 
     // Minimal globals to satisfy editor.ts on import without creating the editor
-    (global as any).document = {
+    (global as unknown as { document: { readyState: string; addEventListener: jest.Mock } }).document = {
       readyState: 'loading',
       addEventListener: jest.fn(),
     };
-    (global as any).window = {
+    (global as unknown as { window: { setTimeout: typeof setTimeout; clearTimeout: typeof clearTimeout; addEventListener: jest.Mock } }).window = {
       setTimeout,
       clearTimeout,
       addEventListener: jest.fn(),
     };
-    (global as any).acquireVsCodeApi = jest.fn(() => ({
+    (global as unknown as { acquireVsCodeApi: () => { postMessage: jest.Mock; getState: jest.Mock; setState: jest.Mock } }).acquireVsCodeApi = jest.fn(() => ({
       postMessage: jest.fn(),
       getState: jest.fn(),
       setState: jest.fn(),
     }));
-    (global as any).performance = {
+    (global as unknown as { performance: { now: () => number } }).performance = {
       now: () => 0,
     };
 
