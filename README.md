@@ -8,8 +8,7 @@
 
 ## Why We Built This
 
-> [!NOTE]
-> *100% free. No trials. No limits. No paywalls, ever.*
+> **📌 Note:** *100% free. No trials. No limits. No paywalls, ever.*
 
 ### Writer-First, Human-First
 
@@ -56,21 +55,21 @@ Countless hours went into vibe-coded wireframes, user experience design, and pol
 
 ## Key Features
 
-### True WYSIWYG Editing 
+### True WYSIWYG Editing
 
-![WYSIWYG Editing](<marketplace-assets/screenshots/Hero Image.png>)
+![WYSIWYG Editing](https://raw.githubusercontent.com/concretios/markdown-for-humans/main/marketplace-assets/screenshots/Hero%20Image.png)
 
 *See rendered output as you type, no preview pane needed. Focus on your content, not syntax.*
 
 ### Advanced Table Editing
 
-![Table Editing](<marketplace-assets/screenshots/Rich Table Editing.png>)
+![Table Editing](https://raw.githubusercontent.com/concretios/markdown-for-humans/main/marketplace-assets/screenshots/Rich%20Table%20Editing.png)
 
 *Drag column borders to resize, use the toolbar dropdown to add/remove rows and columns, right-click for quick actions.*
 
 ### Mermaid Diagrams
 
-![Mermaid Diagrams](<marketplace-assets/screenshots/Mermaid Diagram Support.png>)
+![Mermaid Diagrams](https://raw.githubusercontent.com/concretios/markdown-for-humans/main/marketplace-assets/screenshots/Mermaid%20Diagram%20Support.png)
 
 *Create flowcharts, sequence diagrams, Gantt charts, and more with 15 built-in templates.*
 
@@ -78,7 +77,7 @@ Countless hours went into vibe-coded wireframes, user experience design, and pol
 
 It asks a local folder in workspace to save the same, to keep your MD assets organised.
 
-![Drag Drop Images](<marketplace-assets/screenshots/Drag Drop Image Insertions.png>)
+![Drag Drop Images](https://raw.githubusercontent.com/concretios/markdown-for-humans/main/marketplace-assets/screenshots/Drag%20Drop%20Image%20Insertions.png)
 
 *Just drag images into your document. Resize with handles, view metadata overlay.*
 
@@ -124,8 +123,8 @@ Markdown for Humans includes everything you need for a modern writing experience
 
 ## Contributing
 
-> [!NOTE]
-> ⚡ **Built on open source, for the community.**  
+> **⚡ Built on open source, for the community.**
+>
 > Markdown for Humans exists because open source software empowers everyone. We believe that the best tools should be built, improved, and maintained by the whole community—not limited by a few. By embracing collaboration and transparency, we keep innovation moving forward for everyone.
 
 We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
