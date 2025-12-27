@@ -13,7 +13,9 @@ describe('Tab Indentation Extension', () => {
 
   beforeEach(async () => {
     jest.resetModules();
-    ({ NodeSelection: { prototype: nodeSelectionPrototype } } = await import('prosemirror-state'));
+    ({
+      NodeSelection: { prototype: nodeSelectionPrototype },
+    } = await import('prosemirror-state'));
     ({ TabIndentation } = await import('../../webview/extensions/tabIndentation'));
   });
 
