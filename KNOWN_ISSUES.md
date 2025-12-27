@@ -259,8 +259,9 @@ _None currently. All critical issues have been resolved._
 - [x] License file present ✅
 - [x] CI/CD configured ✅
 - [x] Gallery banner configured ✅
+- [x] Git tag v0.1.0 created ✅
 - [ ] Repository made public
-- [ ] GitHub release created
+- [ ] GitHub release created from tag
 - [ ] VS Code Marketplace published
 
 ### Target Metrics (v0.2.0):
@@ -315,8 +316,9 @@ All items in this document are **nice-to-haves** for future versions (v0.2.0+), 
 
 **Immediate Next Steps:**
 1. Make repository public
-2. Create v0.1.0 GitHub release
-3. Publish to VS Code Marketplace
+2. ✅ Create v0.1.0 git tag (completed)
+3. Create v0.1.0 GitHub release from tag
+4. Publish to VS Code Marketplace
 
 ---
 
