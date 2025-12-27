@@ -1,0 +1,74 @@
+import { WorkspaceEdit, Position, workspace } from 'vscode';
+import { MarkdownEditorProvider } from '../../editor/MarkdownEditorProvider';
+
+// Helper to create a minimal mock TextDocument
+function createDocument(content: string, uri = 'file://test.md') {
+  return {
+    getText: jest.fn(() => content),
+    uri: {
+      toString: () => uri,
+    },
+    positionAt: jest.fn((offset: number) => new Position(0, offset)),
+  };
+}
+
+describe('MarkdownEditorProvider frontmatter rendering', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('wraps YAML frontmatter in a fenced code block when sending to webview', () => {
+    const provider = new MarkdownEditorProvider({} as any);
+    const content = [
+      '---',
+      'title: Example',
+      'slug: example',
+      '---',
+      '',
+      '# Heading',
+      'body content',
+    ].join('\n');
+
+    const document = createDocument(content);
+    const webview = { postMessage: jest.fn() };
+
+    (provider as any).updateWebview(document, webview);
+
+    expect(webview.postMessage).toHaveBeenCalledTimes(1);
+    const payload = (webview.postMessage as jest.Mock).mock.calls[0][0];
+    expect(payload.type).toBe('update');
+
+    const wrapped = payload.content as string;
+    expect(wrapped.startsWith('```yaml')).toBe(true);
+    expect(wrapped).toContain('title: Example');
+    expect(wrapped).toContain('slug: example');
+    expect(wrapped).toContain('```');
+    expect(wrapped.trimEnd()).toContain('# Heading');
+  });
+
+  it('restores YAML delimiters when saving an edited fenced block', async () => {
+    const provider = new MarkdownEditorProvider({} as any);
+    const original = ['---', 'title: Old', '---', '', '# Heading'].join('\n');
+    const document: any = createDocument(original);
+    const webview = { postMessage: jest.fn() };
+
+    // Seed any internal caches via updateWebview
+    (provider as any).updateWebview(document, webview);
+
+    const editedFenced = ['```yaml', '---', 'title: New', '---', '```', '', '# Heading'].join('\n');
+
+    let savedText = '';
+    (workspace.applyEdit as jest.Mock).mockImplementation(async (edit: WorkspaceEdit) => {
+      const replaces = (edit as any).replaces || [];
+      if (replaces.length > 0) {
+        savedText = replaces[0].text;
+      }
+      return true;
+    });
+
+    await (provider as any).applyEdit(editedFenced, document);
+
+    expect(savedText.startsWith('---\ntitle: New')).toBe(true);
+    expect(savedText).toContain('\n---\n\n# Heading');
+  });
+});

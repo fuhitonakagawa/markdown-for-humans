@@ -1,0 +1,147 @@
+/**
+ * Regression tests for webview undo/redo guards.
+ *
+ * We avoid initializing TipTap by mocking document.readyState as "loading"
+ * so initializeEditor is never invoked during module import.
+ */
+
+// Mock TipTap and related heavy dependencies to avoid DOM requirements
+jest.mock('@tiptap/core', () => ({
+  Editor: jest.fn(),
+  Extension: { create: (config: any) => config },
+}));
+jest.mock('@tiptap/starter-kit', () => ({ __esModule: true, default: { configure: () => ({}) } }));
+jest.mock('@tiptap/markdown', () => ({ Markdown: { configure: () => ({}) } }));
+jest.mock('lowlight', () => ({ __esModule: true, lowlight: { registerLanguage: jest.fn() } }));
+jest.mock('@tiptap/extension-table', () => ({
+  __esModule: true,
+  TableKit: { configure: () => ({}) },
+}));
+jest.mock('@tiptap/extension-list', () => ({
+  __esModule: true,
+  ListKit: { configure: () => ({}) },
+  OrderedList: { extend: (config: any) => config },
+}));
+jest.mock('@tiptap/extension-link', () => ({
+  __esModule: true,
+  default: { configure: () => ({}) },
+}));
+jest.mock('@tiptap/extension-code-block-lowlight', () => ({
+  __esModule: true,
+  default: { configure: () => ({}) },
+}));
+jest.mock('./../../webview/extensions/customImage', () => ({
+  CustomImage: { configure: () => ({}) },
+}));
+jest.mock('./../../webview/extensions/mermaid', () => ({ Mermaid: {} }));
+jest.mock('./../../webview/extensions/tabIndentation', () => ({ TabIndentation: {} }));
+jest.mock('./../../webview/extensions/imageEnterSpacing', () => ({ ImageEnterSpacing: {} }));
+jest.mock('./../../webview/extensions/markdownParagraph', () => ({ MarkdownParagraph: {} }));
+jest.mock('./../../webview/extensions/githubAlerts', () => ({ GitHubAlert: {} }));
+jest.mock('./../../webview/BubbleMenuView', () => ({
+  createFormattingToolbar: () => ({}),
+  createTableMenu: () => ({}),
+  updateToolbarStates: jest.fn(),
+}));
+jest.mock('./../../webview/features/imageDragDrop', () => ({
+  setupImageDragDrop: jest.fn(),
+  hasPendingImageSaves: jest.fn(() => false),
+  getPendingImageCount: jest.fn(() => 0),
+}));
+jest.mock('./../../webview/features/tocOverlay', () => ({ toggleTocOverlay: jest.fn() }));
+jest.mock('./../../webview/features/searchOverlay', () => ({ toggleSearchOverlay: jest.fn() }));
+jest.mock('./../../webview/utils/exportContent', () => ({
+  collectExportContent: jest.fn(),
+  getDocumentTitle: jest.fn(),
+}));
+jest.mock('./../../webview/utils/pasteHandler', () => ({
+  processPasteContent: jest.fn(() => ({ isImage: false, wasConverted: false, content: '' })),
+}));
+jest.mock('./../../webview/utils/copyMarkdown', () => ({ copySelectionAsMarkdown: jest.fn() }));
+jest.mock('./../../webview/utils/outline', () => ({ buildOutlineFromEditor: jest.fn(() => []) }));
+jest.mock('./../../webview/utils/scrollToHeading', () => ({ scrollToHeading: jest.fn() }));
+
+describe('webview undo/redo guards', () => {
+  let testing: any;
+
+  const setupModule = () => {
+    jest.resetModules();
+
+    // Minimal globals to satisfy editor.ts on import without creating the editor
+    (global as any).document = {
+      readyState: 'loading',
+      addEventListener: jest.fn(),
+    };
+    (global as any).window = {
+      setTimeout,
+      clearTimeout,
+      addEventListener: jest.fn(),
+    };
+    (global as any).acquireVsCodeApi = jest.fn(() => ({
+      postMessage: jest.fn(),
+      getState: jest.fn(),
+      setState: jest.fn(),
+    }));
+    (global as any).performance = {
+      now: () => 0,
+    };
+
+    jest.isolateModules(() => {
+      const mod = require('../../webview/editor');
+      testing = mod.__testing;
+    });
+  };
+
+  beforeEach(() => {
+    setupModule();
+    testing.resetSyncState();
+  });
+
+  it('skips update when content matches recently sent hash', () => {
+    const mockEditor = {
+      getMarkdown: jest.fn().mockReturnValue('old'),
+      state: { selection: { from: 0, to: 0 }, doc: { content: { size: 0 } } },
+      commands: { setContent: jest.fn(), setTextSelection: jest.fn() },
+    };
+
+    testing.setMockEditor(mockEditor);
+    // Track content we "sent" - this should cause the update to be skipped
+    testing.trackSentContentForTests('new');
+
+    testing.updateEditorContentForTests('new');
+
+    expect(mockEditor.commands.setContent).not.toHaveBeenCalled();
+  });
+
+  it('skips update when content is unchanged', () => {
+    const mockEditor = {
+      getMarkdown: jest.fn().mockReturnValue('same'),
+      state: { selection: { from: 1, to: 1 }, doc: { content: { size: 10 } } },
+      commands: { setContent: jest.fn(), setTextSelection: jest.fn() },
+    };
+
+    testing.setMockEditor(mockEditor);
+
+    testing.updateEditorContentForTests('same');
+
+    expect(mockEditor.commands.setContent).not.toHaveBeenCalled();
+  });
+
+  it('applies update when content changes', () => {
+    const mockEditor = {
+      getMarkdown: jest.fn().mockReturnValue('old'),
+      state: { selection: { from: 2, to: 4 }, doc: { content: { size: 5 } } },
+      commands: { setContent: jest.fn(), setTextSelection: jest.fn() },
+    };
+
+    testing.setMockEditor(mockEditor);
+
+    testing.updateEditorContentForTests('new content');
+
+    // @tiptap/markdown v3 requires contentType option
+    expect(mockEditor.commands.setContent).toHaveBeenCalledWith('new content', {
+      contentType: 'markdown',
+    });
+    expect(mockEditor.commands.setTextSelection).toHaveBeenCalledWith({ from: 2, to: 4 });
+  });
+});

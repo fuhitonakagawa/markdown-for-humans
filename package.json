@@ -1,0 +1,218 @@
+{
+  "name": "markdown-for-humans",
+  "displayName": "Markdown for Humans",
+  "description": "Seamless WYSIWYG markdown editing for VS Code — Write markdown the way humans think",
+  "version": "0.1.0",
+  "publisher": "concretio",
+  "author": {
+    "name": "Abhinav",
+    "email": "abhinav@concret.io"
+  },
+  "license": "MIT",
+  "icon": "icon.png",
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/concretios/markdown-for-humans"
+  },
+  "bugs": {
+    "url": "https://github.com/concretios/markdown-for-humans/issues"
+  },
+  "homepage": "https://github.com/concretios/markdown-for-humans#readme",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "markdown",
+    "wysiwyg",
+    "editor",
+    "md",
+    "preview",
+    "writing"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "markdownForHumans.editor",
+        "displayName": "Markdown for Humans",
+        "selector": [
+          {
+            "filenamePattern": "*.md",
+            "scheme": "file"
+          },
+          {
+            "filenamePattern": "*.markdown",
+            "scheme": "file"
+          },
+          {
+            "filenamePattern": "*.md",
+            "scheme": "untitled"
+          },
+          {
+            "filenamePattern": "*.markdown",
+            "scheme": "untitled"
+          }
+        ],
+        "priority": "option"
+      }
+    ],
+    "commands": [
+      {
+        "command": "markdownForHumans.openFile",
+        "title": "Open with Markdown for Humans"
+      },
+      {
+        "command": "markdownForHumans.outline.revealCurrent",
+        "title": "Outline: Reveal Current Heading",
+        "icon": "$(target)"
+      },
+      {
+        "command": "markdownForHumans.outline.filter",
+        "title": "Outline: Filter Headings",
+        "icon": "$(search)"
+      },
+      {
+        "command": "markdownForHumans.outline.clearFilter",
+        "title": "Outline: Clear Filter",
+        "icon": "$(close)"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "markdownForHumansOutline",
+          "name": "Markdown for Humans: Outline",
+          "when": "markdownForHumans.isActive"
+        }
+      ]
+    },
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "markdownForHumans.openFile",
+          "when": "resourceExtname == .md",
+          "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "markdownForHumans.outline.revealCurrent",
+          "when": "view == markdownForHumansOutline",
+          "group": "navigation@1"
+        },
+        {
+          "command": "markdownForHumans.outline.filter",
+          "when": "view == markdownForHumansOutline && !markdownForHumans.outlineFilterActive",
+          "group": "navigation@2"
+        },
+        {
+          "command": "markdownForHumans.outline.clearFilter",
+          "when": "view == markdownForHumansOutline && markdownForHumans.outlineFilterActive",
+          "group": "navigation@2"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Markdown for Humans",
+      "properties": {
+        "markdownForHumans.imagePath": {
+          "type": "string",
+          "default": "images",
+          "description": "Folder path for saved images. Interpreted relative to markdownForHumans.imagePathBase."
+        },
+        "markdownForHumans.imagePathBase": {
+          "type": "string",
+          "enum": [
+            "relativeToDocument",
+            "workspaceFolder"
+          ],
+          "default": "relativeToDocument",
+          "description": "Controls whether Image Path is relative to the current markdown file folder or the workspace folder."
+        },
+        "markdownForHumans.chromePath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to Google Chrome or Chromium executable for PDF export. Leave empty to auto-detect.\n\n**Download Chrome:**\n- [Windows/Mac/Linux](https://www.google.com/chrome/)\n- [Chromium (open source)](https://www.chromium.org/getting-involved/download-chromium/)\n\n**Common paths:**\n- **Mac:** `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`\n- **Windows:** `C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe`\n- **Linux:** `/usr/bin/google-chrome` or `/usr/bin/chromium`"
+        },
+        "markdownForHumans.imageResize.skipWarning": {
+          "type": "boolean",
+          "default": false,
+          "description": "Skip the warning dialog when resizing images. When enabled, images will be resized immediately without confirmation."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build && npm run verify-build",
+    "build": "npm run build:extension && npm run build:webview",
+    "build:marketplace": "npm run build:extension:marketplace && npm run build:webview:marketplace && npm run verify-build",
+    "verify-build": "node scripts/verify-build.js",
+    "build:extension": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --minify --tree-shaking=true",
+    "build:extension:marketplace": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --minify --tree-shaking=true",
+    "build:webview": "node scripts/build-webview.js --prod",
+    "build:webview:marketplace": "node scripts/build-webview.js --prod --no-sourcemap",
+    "watch": "concurrently \"npm run watch:extension\" \"npm run watch:webview\"",
+    "watch:extension": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --watch",
+    "watch:webview": "node scripts/build-webview.js --watch",
+    "lint": "eslint src --ext ts",
+    "lint:fix": "eslint src --ext ts --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "precommit": "npm run lint && npm run test",
+    "validate": "npm run lint && npm run test && npm run build",
+    "package": "npm run build && vsce package",
+    "package:marketplace": "npm run build:marketplace && vsce package",
+    "publish": "vsce publish",
+    "install-hooks": "./scripts/install-git-hooks.sh"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.3",
+    "@types/image-size": "^0.7.0",
+    "@types/jest": "^29.5.11",
+    "@types/node": "^20.10.6",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^8.48.1",
+    "@typescript-eslint/parser": "^8.48.1",
+    "@vscode/vsce": "^3.7.1",
+    "concurrently": "^8.2.2",
+    "esbuild": "^0.27.1",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^30.2.0",
+    "prettier": "^3.1.1",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@tiptap/core": "^3.0.0",
+    "@tiptap/extension-code-block-lowlight": "^3.0.0",
+    "@tiptap/extension-image": "^3.0.0",
+    "@tiptap/extension-link": "^3.0.0",
+    "@tiptap/extension-list": "^3.0.0",
+    "@tiptap/extension-table": "^3.0.0",
+    "@tiptap/markdown": "^3.0.0",
+    "@tiptap/pm": "^3.0.0",
+    "@tiptap/starter-kit": "^3.0.0",
+    "@types/turndown": "^5.0.4",
+    "cheerio": "^1.1.2",
+    "docx": "^9.5.1",
+    "highlight.js": "^11.11.1",
+    "image-size": "^2.0.2",
+    "katex": "^0.16.9",
+    "lowlight": "^2.9.0",
+    "markdown-it": "^14.0.0",
+    "mermaid": "^10.6.1",
+    "turndown": "^7.1.2"
+  }
+}

@@ -1,0 +1,65 @@
+/**
+ * Copyright (c) 2025-2026 Concret.io
+ *
+ * Licensed under the MIT License. See LICENSE file in the project root for details.
+ */
+
+import type { JSONContent, MarkdownParseHelpers, MarkdownToken } from '@tiptap/core';
+import { OrderedList } from '@tiptap/extension-list';
+
+type OrderedListToken = MarkdownToken & {
+  type: 'list';
+  ordered?: boolean;
+  start?: number;
+  items?: MarkdownToken[];
+};
+
+/**
+ * OrderedList markdown parsing fix.
+ *
+ * `@tiptap/extension-list` includes a custom markdown tokenizer for ordered lists that matches
+ * the `1.` style. When the markdown uses the CommonMark-valid `1)` style, marked.js produces
+ * list item tokens where the first child is a `text` token containing inline tokens.
+ *
+ * The default OrderedList markdown parser path in `@tiptap/extension-list` drops inline tokens
+ * for those `text` blocks, causing raw markdown like `**bold**` to render literally on first load.
+ *
+ * Fix: delegate list item parsing to the ListItem extension via `helpers.parseChildren(items)`,
+ * which correctly parses inline marks for both `1.` and `1)` list styles.
+ */
+export const OrderedListMarkdownFix = OrderedList.extend({
+  parseMarkdown: (
+    token: MarkdownToken,
+    helpers: MarkdownParseHelpers
+  ): JSONContent | JSONContent[] => {
+    if (token.type !== 'list') {
+      return [];
+    }
+
+    const listToken = token as OrderedListToken;
+    if (!listToken.ordered) {
+      return [];
+    }
+
+    const start =
+      typeof listToken.start === 'number' && Number.isFinite(listToken.start) ? listToken.start : 1;
+    const items = Array.isArray(listToken.items) ? listToken.items : [];
+    const content =
+      items.length > 0 && typeof helpers.parseChildren === 'function'
+        ? helpers.parseChildren(items)
+        : [];
+
+    if (start !== 1) {
+      return {
+        type: 'orderedList',
+        attrs: { start },
+        content,
+      };
+    }
+
+    return {
+      type: 'orderedList',
+      content,
+    };
+  },
+});

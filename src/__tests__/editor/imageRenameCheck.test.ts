@@ -1,0 +1,108 @@
+import { MarkdownEditorProvider } from '../../editor/MarkdownEditorProvider';
+import * as vscode from 'vscode';
+
+jest.mock('vscode', () => ({
+  window: {
+    showErrorMessage: jest.fn(),
+    showInformationMessage: jest.fn(),
+  },
+  workspace: {
+    getWorkspaceFolder: jest.fn(),
+    workspaceFolders: undefined,
+    getConfiguration: jest.fn(() => ({
+      get: jest.fn((_key: string, defaultValue?: unknown) => defaultValue),
+      update: jest.fn(),
+    })),
+    onDidChangeTextDocument: jest.fn(),
+    onDidChangeConfiguration: jest.fn(),
+    applyEdit: jest.fn(),
+    fs: {
+      stat: jest.fn(),
+    },
+  },
+  Uri: {
+    file: jest.fn((p: string) => ({ fsPath: p, scheme: 'file' })),
+  },
+  TreeItem: class TreeItem {
+    constructor(
+      public label: any,
+      public collapsibleState?: any
+    ) {}
+  },
+  TreeItemCollapsibleState: {
+    None: 0,
+    Collapsed: 1,
+    Expanded: 2,
+  },
+  ThemeIcon: class ThemeIcon {
+    constructor(
+      public id: string,
+      public color?: any
+    ) {}
+  },
+  ThemeColor: class ThemeColor {
+    constructor(public id: string) {}
+  },
+  EventEmitter: class EventEmitter<T> {
+    public event = jest.fn();
+    fire = jest.fn((_data?: T) => {});
+    dispose = jest.fn();
+  },
+  ViewColumn: {
+    Beside: 2,
+    Active: -1,
+  },
+  commands: {
+    executeCommand: jest.fn(),
+    registerCommand: jest.fn(() => ({ dispose: jest.fn() })),
+  },
+  WorkspaceEdit: jest.fn(),
+  Range: jest.fn(),
+  Position: jest.fn(),
+}));
+
+function createMockTextDocument(): any {
+  return {
+    getText: jest.fn(() => ''),
+    uri: {
+      scheme: 'file',
+      fsPath: '/workspace/docs/doc.md',
+      toString: () => 'file:/workspace/docs/doc.md',
+    },
+    fileName: '/workspace/docs/doc.md',
+    lineCount: 1,
+  };
+}
+
+describe('MarkdownEditorProvider - checkImageRename', () => {
+  it('returns exists=true when the target filename already exists', async () => {
+    const provider = new MarkdownEditorProvider({
+      extensionUri: { fsPath: '/extension' } as any,
+      subscriptions: [],
+    } as any);
+    const document = createMockTextDocument();
+    const mockWebview = { postMessage: jest.fn() };
+
+    (vscode.workspace.fs.stat as jest.Mock).mockImplementation(async (uri: any) => {
+      if (uri.fsPath.endsWith('/images/cat.png')) return {} as any;
+      if (uri.fsPath.endsWith('/images/dog.png')) return {} as any;
+      throw new Error(`Unexpected path: ${uri.fsPath}`);
+    });
+
+    await (provider as any).handleCheckImageRename(
+      { type: 'checkImageRename', requestId: 'req-1', oldPath: './images/cat.png', newName: 'dog' },
+      document,
+      mockWebview
+    );
+
+    expect(mockWebview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'imageRenameCheck',
+        requestId: 'req-1',
+        exists: true,
+        newFilename: 'dog.png',
+        newPath: './images/dog.png',
+      })
+    );
+  });
+});

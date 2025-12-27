@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discussions
+    url: https://github.com/concretios/markdown-for-humans/discussions
+    about: Ask questions and discuss ideas with the community
+  - name: 📖 Documentation
+    url: https://github.com/concretios/markdown-for-humans#readme
+    about: Read the documentation for help and guides
+  - name: 🐛 Troubleshooting Guide
+    url: https://github.com/concretios/markdown-for-humans/blob/main/docs/TROUBLESHOOTING.md
+    about: Check the troubleshooting guide for common issues
+  - name: 📧 Email Support
+    url: mailto:support@concret.io
+    about: Contact us directly for support
