@@ -42,8 +42,8 @@ jest.mock('@tiptap/pm/state', () => {
   class Plugin {
     key: string | undefined;
     props: Record<string, unknown>;
-    spec: any;
-    constructor(spec: any) {
+    spec: { props?: Record<string, unknown>; key?: string };
+    constructor(spec: { props?: Record<string, unknown>; key?: string }) {
       this.spec = spec;
       this.props = spec.props || {};
       this.key = spec.key;
@@ -52,6 +52,7 @@ jest.mock('@tiptap/pm/state', () => {
   return { PluginKey, Plugin };
 });
 
+import type { Editor } from '@tiptap/core';
 import {
   findMatches,
   showSearchOverlay,
@@ -87,7 +88,7 @@ function createMockEditorWithView(text: string): MockEditor {
   const domAtPos = jest.fn().mockReturnValue({
     node: (() => {
       const el = document.createElement('div');
-      (el as any).scrollIntoView = jest.fn();
+      (el as unknown as { scrollIntoView?: jest.Mock }).scrollIntoView = jest.fn();
       return el;
     })(),
     offset: 0,
@@ -99,14 +100,21 @@ function createMockEditorWithView(text: string): MockEditor {
     focus: jest.fn(),
   };
 
-  const tr: any = { mapping: {} };
-  tr.scrollIntoView = jest.fn(() => tr);
-  tr.setMeta = jest.fn(() => tr);
-  tr.getMeta = jest.fn(() => undefined);
+  const tr: {
+    mapping: Record<string, unknown>;
+    scrollIntoView: jest.Mock;
+    setMeta: jest.Mock;
+    getMeta: jest.Mock;
+  } = {
+    mapping: {},
+    scrollIntoView: jest.fn(() => tr),
+    setMeta: jest.fn(() => tr),
+    getMeta: jest.fn(() => undefined),
+  };
 
   const state = {
     tr,
-    plugins: [] as any[],
+    plugins: [] as Array<{ key?: string; props?: Record<string, unknown> }>,
     selection: { from: 0, to: text.length },
     doc: {
       descendants: jest.fn(
@@ -123,8 +131,8 @@ function createMockEditorWithView(text: string): MockEditor {
     view,
     commands,
     state,
-    registerPlugin: jest.fn((plugin: any) => {
-      (state.plugins as any[]).push(plugin);
+    registerPlugin: jest.fn((plugin: { key?: string; props?: Record<string, unknown> }) => {
+      state.plugins.push(plugin);
     }),
   };
 }
@@ -147,7 +155,9 @@ function createMockEditor(content: string) {
   return {
     state: {
       doc: {
-        descendants: (callback: (node: any, pos: number) => boolean) => {
+        descendants: (
+          callback: (node: { isText: boolean; text: string }, pos: number) => boolean
+        ) => {
           textNodes.forEach(({ text, pos }) => {
             callback({ isText: true, text }, pos);
           });
@@ -162,13 +172,13 @@ describe('Search Overlay', () => {
   describe('findMatches', () => {
     it('should return empty array for empty query', () => {
       const editor = createMockEditor('Hello world');
-      const result = findMatches(editor as any, '');
+      const result = findMatches(editor as unknown as Editor, '');
       expect(result).toEqual([]);
     });
 
     it('should find single match', () => {
       const editor = createMockEditor('Hello world');
-      const result = findMatches(editor as any, 'world');
+      const result = findMatches(editor as unknown as Editor, 'world');
 
       expect(result).toHaveLength(1);
       expect(result[0].to - result[0].from).toBe(5); // 'world' length
@@ -176,14 +186,14 @@ describe('Search Overlay', () => {
 
     it('should find multiple matches', () => {
       const editor = createMockEditor('Hello world, wonderful world');
-      const result = findMatches(editor as any, 'world');
+      const result = findMatches(editor as unknown as Editor, 'world');
 
       expect(result).toHaveLength(2);
     });
 
     it('should be case-insensitive', () => {
       const editor = createMockEditor('Hello WORLD, World, world');
-      const result = findMatches(editor as any, 'world');
+      const result = findMatches(editor as unknown as Editor, 'world');
 
       expect(result).toHaveLength(3);
     });
@@ -242,7 +252,7 @@ describe('Search Overlay', () => {
   describe('match positions', () => {
     it('should return correct from/to positions', () => {
       const editor = createMockEditor('Hello world');
-      const result = findMatches(editor as any, 'world');
+      const result = findMatches(editor as unknown as Editor, 'world');
 
       expect(result).toHaveLength(1);
       // The exact position depends on the mock structure
@@ -286,15 +296,15 @@ describe('Search Overlay', () => {
       const editor = createMockEditor('Hello [world] (test) {foo}');
 
       // These should not throw errors (no regex interpretation)
-      expect(() => findMatches(editor as any, '[world]')).not.toThrow();
-      expect(() => findMatches(editor as any, '(test)')).not.toThrow();
-      expect(() => findMatches(editor as any, '{foo}')).not.toThrow();
-      expect(() => findMatches(editor as any, '.*')).not.toThrow();
+      expect(() => findMatches(editor as unknown as Editor, '[world]')).not.toThrow();
+      expect(() => findMatches(editor as unknown as Editor, '(test)')).not.toThrow();
+      expect(() => findMatches(editor as unknown as Editor, '{foo}')).not.toThrow();
+      expect(() => findMatches(editor as unknown as Editor, '.*')).not.toThrow();
     });
 
     it('should handle backslash in query', () => {
       const editor = createMockEditor('path\\to\\file');
-      const result = findMatches(editor as any, '\\');
+      const result = findMatches(editor as unknown as Editor, '\\');
 
       expect(result).toHaveLength(2);
     });
@@ -302,7 +312,7 @@ describe('Search Overlay', () => {
 });
 
 describe('Search Overlay UI behaviors', () => {
-  let editor: any;
+  let editor: MockEditor;
 
   beforeEach(() => {
     // Clean DOM between tests
@@ -313,18 +323,18 @@ describe('Search Overlay UI behaviors', () => {
   });
 
   afterEach(() => {
-    hideSearchOverlay(editor, false);
+    hideSearchOverlay(editor as unknown as Editor, false);
   });
 
   it('focuses the search input when shown', () => {
-    showSearchOverlay(editor);
+    showSearchOverlay(editor as unknown as Editor);
     const input = document.querySelector('.search-overlay-input') as HTMLInputElement;
     expect(input).toBeTruthy();
     expect(document.activeElement).toBe(input);
   });
 
   it('Cmd/Ctrl+A selects all text within the search input', () => {
-    showSearchOverlay(editor);
+    showSearchOverlay(editor as unknown as Editor);
     const input = document.querySelector('.search-overlay-input') as HTMLInputElement;
     input.value = 'hello world';
     input.setSelectionRange(5, 5);
@@ -339,7 +349,7 @@ describe('Search Overlay UI behaviors', () => {
   });
 
   it('Enter cycles to next match and keeps input focused', () => {
-    showSearchOverlay(editor);
+    showSearchOverlay(editor as unknown as Editor);
     const input = document.querySelector('.search-overlay-input') as HTMLInputElement;
     input.value = 'hello';
     input.dispatchEvent(new Event('input', { bubbles: true }));

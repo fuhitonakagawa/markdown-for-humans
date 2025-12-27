@@ -34,17 +34,18 @@ const parseMarkdown = (token: MarkdownToken, helpers: MarkdownParseHelpers) => {
   const contentLines = lines.slice(1);
   const content = contentLines.length > 0 ? contentLines.join('\n').trim() : '';
 
-  const childTokens = Array.isArray((token as any).tokens)
-    ? JSON.parse(JSON.stringify(token.tokens))
+  const childTokens = Array.isArray((token as unknown as { tokens?: unknown[] }).tokens)
+    ? JSON.parse(JSON.stringify((token as unknown as { tokens: unknown[] }).tokens))
     : [];
 
   // Remove the alert marker from the first paragraph if present
   if (
     childTokens.length > 0 &&
-    childTokens[0].type === 'paragraph' &&
-    Array.isArray((childTokens[0] as any).tokens)
+    (childTokens[0] as { type?: string }).type === 'paragraph' &&
+    Array.isArray((childTokens[0] as unknown as { tokens?: unknown[] }).tokens)
   ) {
-    const paragraphTokens = (childTokens[0] as any).tokens as any[];
+    const paragraphTokens = ((childTokens[0] as unknown as { tokens: unknown[] }).tokens ||
+      []) as Array<{ type?: string; text?: string }>;
     const firstInline = paragraphTokens[0];
     if (firstInline && firstInline.type === 'text') {
       const trimmed = (firstInline.text ?? '').trim();
@@ -414,8 +415,14 @@ describe('GitHub Alerts TipTap extension markdown integration', () => {
       raw: '> [!NOTE]\n>\n> Content after blank line',
       text: '[!NOTE]\n\nContent after blank line',
       tokens: [
-        { type: 'paragraph', tokens: [{ type: 'text', text: '[!NOTE]' }] } as any,
-        { type: 'paragraph', tokens: [{ type: 'text', text: 'Content after blank line' }] } as any,
+        {
+          type: 'paragraph',
+          tokens: [{ type: 'text', text: '[!NOTE]' }],
+        } as unknown as MarkdownToken,
+        {
+          type: 'paragraph',
+          tokens: [{ type: 'text', text: 'Content after blank line' }],
+        } as unknown as MarkdownToken,
       ],
     };
 
@@ -455,7 +462,7 @@ describe('GitHub Alerts TipTap extension markdown integration', () => {
             { type: 'text', text: '[!IMPORTANT]' },
             { type: 'text', text: '\nStarts after break' },
           ],
-        } as any,
+        } as unknown as MarkdownToken,
       ],
     };
 
@@ -501,11 +508,11 @@ describe('GitHub Alerts TipTap extension markdown integration', () => {
             { type: 'text', text: '[!NOTE]' },
             { type: 'text', text: '\nFirst paragraph' },
           ],
-        } as any,
+        } as unknown as MarkdownToken,
         {
           type: 'paragraph',
           tokens: [{ type: 'text', text: 'Second paragraph' }],
-        } as any,
+        } as unknown as MarkdownToken,
       ],
     };
 
@@ -586,9 +593,13 @@ describe('GitHub Alerts TipTap extension markdown integration', () => {
     const helpers = {
       renderChildren: jest.fn(() => 'This is a note'),
     };
-    const ctx = {} as any;
+    const ctx = {} as RenderContext;
 
-    const output = renderMarkdown(node as any, helpers as any, ctx);
+    const output = renderMarkdown(
+      node as JSONContent,
+      helpers as unknown as MarkdownRendererHelpers,
+      ctx
+    );
 
     expect(output).toBe('> [!NOTE]\n> This is a note');
     expect(helpers.renderChildren).toHaveBeenCalledTimes(1);
@@ -603,9 +614,13 @@ describe('GitHub Alerts TipTap extension markdown integration', () => {
     const helpers = {
       renderChildren: jest.fn(() => 'Be careful'),
     };
-    const ctx = {} as any;
+    const ctx = {} as RenderContext;
 
-    const output = renderMarkdown(node as any, helpers as any, ctx);
+    const output = renderMarkdown(
+      node as JSONContent,
+      helpers as unknown as MarkdownRendererHelpers,
+      ctx
+    );
 
     expect(output).toBe('> [!WARNING]\n> Be careful');
   });
@@ -619,9 +634,13 @@ describe('GitHub Alerts TipTap extension markdown integration', () => {
     const helpers = {
       renderChildren: jest.fn(() => 'Line one\nLine two'),
     };
-    const ctx = {} as any;
+    const ctx = {} as RenderContext;
 
-    const output = renderMarkdown(node as any, helpers as any, ctx);
+    const output = renderMarkdown(
+      node as JSONContent,
+      helpers as unknown as MarkdownRendererHelpers,
+      ctx
+    );
 
     expect(output).toBe('> [!TIP]\n> Line one\n> Line two');
   });
@@ -635,9 +654,13 @@ describe('GitHub Alerts TipTap extension markdown integration', () => {
     const helpers = {
       renderChildren: jest.fn(() => ''),
     };
-    const ctx = {} as any;
+    const ctx = {} as RenderContext;
 
-    const output = renderMarkdown(node as any, helpers as any, ctx);
+    const output = renderMarkdown(
+      node as JSONContent,
+      helpers as unknown as MarkdownRendererHelpers,
+      ctx
+    );
 
     expect(output).toBe('> [!NOTE]\n> ');
   });
@@ -651,9 +674,13 @@ describe('GitHub Alerts TipTap extension markdown integration', () => {
     const helpers = {
       renderChildren: jest.fn(() => 'Regular quote text'),
     };
-    const ctx = {} as any;
+    const ctx = {} as RenderContext;
 
-    const output = renderMarkdown(node as any, helpers as any, ctx);
+    const output = renderMarkdown(
+      node as JSONContent,
+      helpers as unknown as MarkdownRendererHelpers,
+      ctx
+    );
 
     // Should serialize as plain blockquote: > Regular quote text
     expect(output).toBe('> Regular quote text');
@@ -669,9 +696,13 @@ describe('GitHub Alerts TipTap extension markdown integration', () => {
     const helpers = {
       renderChildren: jest.fn(() => ''),
     };
-    const ctx = {} as any;
+    const ctx = {} as RenderContext;
 
-    const output = renderMarkdown(node as any, helpers as any, ctx);
+    const output = renderMarkdown(
+      node as JSONContent,
+      helpers as unknown as MarkdownRendererHelpers,
+      ctx
+    );
 
     // Should serialize as empty blockquote: >
     expect(output).toBe('> ');
@@ -687,9 +718,13 @@ describe('GitHub Alerts TipTap extension markdown integration', () => {
     const helpers = {
       renderChildren: jest.fn(() => 'Line one\nLine two'),
     };
-    const ctx = {} as any;
+    const ctx = {} as RenderContext;
 
-    const output = renderMarkdown(node as any, helpers as any, ctx);
+    const output = renderMarkdown(
+      node as JSONContent,
+      helpers as unknown as MarkdownRendererHelpers,
+      ctx
+    );
 
     // Should serialize as multi-line blockquote: > Line one\n> Line two
     expect(output).toBe('> Line one\n> Line two');
@@ -709,7 +744,11 @@ describe('GitHub Alerts TipTap extension markdown integration', () => {
     const renderHelpers = {
       renderChildren: jest.fn(() => 'Test content'),
     };
-    const rendered = renderMarkdown(parsed as any, renderHelpers as any, {} as any);
+    const rendered = renderMarkdown(
+      parsed as JSONContent,
+      renderHelpers as unknown as MarkdownRendererHelpers,
+      {} as RenderContext
+    );
 
     // Should match original format (allowing for whitespace differences)
     expect(rendered).toContain('[!NOTE]');
