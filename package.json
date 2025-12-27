@@ -172,6 +172,7 @@
     "package": "npm run build && vsce package",
     "package:marketplace": "npm run build:marketplace && vsce package",
     "publish": "vsce publish",
+    "publish:ovsx": "ovsx publish",
     "install-hooks": "./scripts/install-git-hooks.sh"
   },
   "devDependencies": {
