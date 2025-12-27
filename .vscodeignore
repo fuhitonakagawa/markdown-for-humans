@@ -8,6 +8,7 @@ dist/**/*.map
 # Development and documentation files
 docs/**
 roadmap/**
+wiki/**
 vibe-coding-rules/**
 prompts/**
 specs/**
