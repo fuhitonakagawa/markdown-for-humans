@@ -116,10 +116,12 @@ describe('buildResizeBackupLocation', () => {
       now: new Date('2025-12-15T12:34:56.000Z'),
     });
 
-    expect(location.backupDir).toBe(path.join('/workspace', '.md4h', 'image-backups'));
+    // Normalize path for cross-platform comparison
+    const expectedBackupDir = path.join('/workspace', '.md4h', 'image-backups').replace(/\\/g, '/');
+    expect(location.backupDir.replace(/\\/g, '/')).toBe(expectedBackupDir);
     // Special characters should be sanitized by cleanStemForBackup
     expect(location.backupFilename).toMatch(/^original_my-image-1_\d+x\d+px_20251215-123456\.png$/);
-    expect(location.backupFilePath).toContain('.md4h/image-backups');
+    expect(location.backupFilePath).toMatch(/\.md4h[/\\]image-backups/);
   });
 
   it('handles images in deeply nested directories', () => {

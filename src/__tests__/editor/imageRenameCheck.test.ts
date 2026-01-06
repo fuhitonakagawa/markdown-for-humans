@@ -80,8 +80,10 @@ describe('MarkdownEditorProvider - checkImageRename', () => {
     const mockWebview = { postMessage: jest.fn() };
 
     (vscode.workspace.fs.stat as jest.Mock).mockImplementation(async (uri: vscode.Uri) => {
-      if (uri.fsPath.endsWith('/images/cat.png')) return {} as vscode.FileStat;
-      if (uri.fsPath.endsWith('/images/dog.png')) return {} as vscode.FileStat;
+      // Normalize path separators for cross-platform matching (remove drive letter if present)
+      const normalizedPath = uri.fsPath.replace(/\\/g, '/').replace(/^[A-Za-z]:/, '');
+      if (normalizedPath.endsWith('/images/cat.png') || normalizedPath.includes('/images/cat.png')) return {} as vscode.FileStat;
+      if (normalizedPath.endsWith('/images/dog.png') || normalizedPath.includes('/images/dog.png')) return {} as vscode.FileStat;
       throw new Error(`Unexpected path: ${uri.fsPath}`);
     });
 

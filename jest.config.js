@@ -34,7 +34,8 @@ module.exports = {
         '^mermaid$': '<rootDir>/src/__mocks__/mermaid.ts',
         '\\.(css|less|scss)$': '<rootDir>/src/__mocks__/styleMock.ts'
     },
-    setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
+    setupFiles: ['<rootDir>/src/__tests__/setup.ts'],
+    setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup-after-env.ts'],
     verbose: true,
     // Fail tests on console warnings/errors to catch issues early
     silent: false
