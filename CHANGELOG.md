@@ -5,6 +5,16 @@ All notable changes to Markdown for Humans will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Optimized marketplace discoverability: Updated displayName to "Markdown WYSIWYG Editor for Humans" to improve search ranking for "markdown editor" and "wysiwyg markdown" queries
+- Expanded keywords from 6 to 30 terms for better marketplace visibility
+- Updated description to SEO-optimized version highlighting key features
+- Restructured README with comparison table and improved SEO positioning
+
+---
+
 ## [0.1.0] - Initial Release
 
 ### Added

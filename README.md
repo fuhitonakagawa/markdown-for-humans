@@ -1,8 +1,20 @@
-# Markdown for Humans
+# Markdown WYSIWYG Editor for Humans
 
 **Seamless WYSIWYG markdown editing for VS Code** — Write markdown the way humans think.
 
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/concretio.markdown-for-humans?label=VS%20Code%20Marketplace&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=concretio.markdown-for-humans) [![Open VSX](https://img.shields.io/open-vsx/v/concretio/markdown-for-humans?label=Open%20VSX&logo=eclipse)](https://open-vsx.org/extension/concretio/markdown-for-humans) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg) ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
+
+---
+
+## ✨ What Makes It Different
+
+| Feature | Markdown for Humans | Markdown All in One | Standard Editors |
+|---------|---------------------|---------------------|------------------|
+| **WYSIWYG Editing** | ✅ Full-screen, no split pane | ❌ Split pane only | ❌ Plain text |
+| **Visual Table Editor** | ✅ Drag, resize, edit cells | ⚠️ Basic syntax | ❌ Manual syntax |
+| **Image Management** | ✅ Rename, resize inline | ❌ Manual file ops | ❌ Manual file ops |
+| **Mermaid Diagrams** | ✅ Live rendering | ✅ Preview only | ❌ Not supported |
+| **Distraction-Free** | ✅ Full-screen mode | ❌ No focus mode | ❌ No focus mode |
 
 ---
 
@@ -30,16 +42,6 @@ Existing markdown editors force writers to choose between:
 - **Standalone apps** that don't integrate with your workflow
 - **Command-heavy interfaces** that bury actions in overloaded palettes, requiring too much typing and mental overhead
 - **Images:** Handling resolution, in-place resizing, size optimisation for large images, workspace directory storage and much more.
-
-### Vibe Coded its way
-
-This extension was built through AI / **vibe coding**, with minimal human effort focused on fixes and stability. The basic functional model came together in minutes, but what took days and hours was **testing each feature** to ensure everything works smoothly in real-world use. 
-
-It's the classic 80:20 rule in action: that final 20% of polish, edge cases, and real-world testing takes 80% of the time, and that's where the real value lives.
-
-We're open-sourcing this because in AI era, **code has limited value**, the real work was in the creativity in planning, design, and relentless testing. 
-
-Countless hours went into vibe-coded wireframes, user experience design, and polish to create something that feels natural and intuitive.
 
 ---
 
@@ -177,6 +179,18 @@ Ways to contribute:
 - Improve documentation
 - Submit pull requests
 - Star the repo
+
+---
+
+## Vibe Coded its way
+
+This extension was built through AI / **vibe coding**, with minimal human effort focused on fixes and stability. The basic functional model came together in minutes, but what took days and hours was **testing each feature** to ensure everything works smoothly in real-world use. 
+
+It's the classic 80:20 rule in action: that final 20% of polish, edge cases, and real-world testing takes 80% of the time, and that's where the real value lives.
+
+We're open-sourcing this because in AI era, **code has limited value**, the real work was in the creativity in planning, design, and relentless testing. 
+
+Countless hours went into vibe-coded wireframes, user experience design, and polish to create something that feels natural and intuitive.
 
 ---
 
