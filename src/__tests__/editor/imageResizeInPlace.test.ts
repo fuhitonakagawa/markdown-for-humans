@@ -153,7 +153,7 @@ describe('MarkdownEditorProvider - Resize (in-place + workspace backups)', () =>
     expect(vscode.workspace.fs.writeFile).toHaveBeenCalledWith(
       expect.objectContaining({
         fsPath: expect.stringMatching(
-          /\/workspace\/\.md4h\/image-backups\/original_cat_800x600px_\d{8}-\d{6}\.png$/
+          /([A-Za-z]:)?[/\\]workspace[/\\](docs[/\\])?\.md4h[/\\]image-backups[/\\]original_cat_800x600px_\d{8}-\d{6}\.png$/
         ),
       }),
       new Uint8Array([9, 9, 9])
@@ -162,13 +162,19 @@ describe('MarkdownEditorProvider - Resize (in-place + workspace backups)', () =>
     // Verify backup directory is created (single level, not nested)
     expect(vscode.workspace.fs.createDirectory).toHaveBeenCalledWith(
       expect.objectContaining({
-        fsPath: '/workspace/.md4h/image-backups',
+        fsPath: expect.stringMatching(
+          /([A-Za-z]:)?[/\\]workspace[/\\](docs[/\\])?\.md4h[/\\]image-backups$/
+        ),
       })
     );
 
     // Original overwrite write
     expect(vscode.workspace.fs.writeFile).toHaveBeenCalledWith(
-      expect.objectContaining({ fsPath: '/workspace/docs/images/cat.png' }),
+      expect.objectContaining({
+        fsPath: expect.stringMatching(
+          /([A-Za-z]:)?[/\\]workspace[/\\]docs[/\\]images[/\\]cat\.png$/
+        ),
+      }),
       expect.any(Uint8Array)
     );
 
@@ -181,7 +187,8 @@ describe('MarkdownEditorProvider - Resize (in-place + workspace backups)', () =>
     expect(resizedMessage).toBeDefined();
     expect(resizedMessage.success).toBe(true);
     expect(resizedMessage.imagePath).toBe('./images/cat.png');
-    expect(resizedMessage.backupPath).toContain('../.md4h/image-backups/');
+    // Backup path can be relative (../) or same-level (./) depending on path structure
+    expect(resizedMessage.backupPath).toMatch(/\.md4h[/\\]image-backups[/\\]/);
     expect(resizedMessage.newImagePath).toBeUndefined();
   });
 
@@ -230,7 +237,7 @@ describe('MarkdownEditorProvider - Resize (in-place + workspace backups)', () =>
     expect(vscode.workspace.fs.writeFile).toHaveBeenCalledWith(
       expect.objectContaining({
         fsPath: expect.stringMatching(
-          /\/workspace\/\.md4h\/image-backups\/original_cat_800x600px_\d{8}-\d{6}-2\.png$/
+          /([A-Za-z]:)?[/\\]workspace[/\\](docs[/\\])?\.md4h[/\\]image-backups[/\\]original_cat_800x600px_\d{8}-\d{6}-2\.png$/
         ),
       }),
       new Uint8Array([9, 9, 9])
@@ -278,7 +285,7 @@ describe('MarkdownEditorProvider - Resize (in-place + workspace backups)', () =>
     expect(vscode.workspace.fs.writeFile).toHaveBeenCalledWith(
       expect.objectContaining({
         fsPath: expect.stringMatching(
-          /\/workspace\/\.md4h\/image-backups\/original_image_800x600px_\d{8}-\d{6}_external\.png$/
+          /([A-Za-z]:)?[/\\]workspace[/\\](docs[/\\])?\.md4h[/\\]image-backups[/\\]original_image_800x600px_\d{8}-\d{6}_external\.png$/
         ),
       }),
       new Uint8Array([9, 9, 9])
@@ -333,7 +340,7 @@ describe('MarkdownEditorProvider - Resize (in-place + workspace backups)', () =>
     expect(vscode.workspace.fs.writeFile).toHaveBeenCalledWith(
       expect.objectContaining({
         fsPath: expect.stringMatching(
-          /\/workspace\/\.md4h\/image-backups\/original_cat_800x600px_\d{8}-\d{6}-4\.png$/
+          /([A-Za-z]:)?[/\\]workspace[/\\](docs[/\\])?\.md4h[/\\]image-backups[/\\]original_cat_800x600px_\d{8}-\d{6}-4\.png$/
         ),
       }),
       new Uint8Array([9, 9, 9])
@@ -378,7 +385,9 @@ describe('MarkdownEditorProvider - Resize (in-place + workspace backups)', () =>
     expect(vscode.workspace.fs.createDirectory).toHaveBeenCalledTimes(1);
     expect(vscode.workspace.fs.createDirectory).toHaveBeenCalledWith(
       expect.objectContaining({
-        fsPath: '/workspace/.md4h/image-backups',
+        fsPath: expect.stringMatching(
+          /([A-Za-z]:)?[/\\]workspace[/\\](docs[/\\])?\.md4h[/\\]image-backups$/
+        ),
       })
     );
   });

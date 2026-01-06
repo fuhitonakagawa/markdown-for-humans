@@ -269,7 +269,9 @@ describe('formatStatsTooltip', () => {
     const tooltip = formatStatsTooltip(stats);
 
     // Should have thousands separators (locale-dependent)
-    expect(tooltip).toMatch(/5[,.]000[,.]000 characters/);
+    // Handles both Western (5,000,000) and Indian (50,00,000) numbering systems
+    // Match either format: "5,000,000" (Western) or "50,00,000" (Indian) or "5.000.000" (European)
+    expect(tooltip).toMatch(/(5,000,000|50,00,000|5\.000\.000|5000000) characters/);
   });
 });
 

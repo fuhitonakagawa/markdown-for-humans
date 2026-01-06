@@ -1,49 +1,43 @@
 /**
- * Jest test setup
+ * Jest test setup (before test files)
  *
- * This file runs before each test file.
- * Use it for global test configuration and utilities.
+ * This file runs BEFORE test files are loaded.
+ * Use it for polyfills and global setup that must be available when test files are parsed.
  */
 
-import { resetAllMocks } from '../__mocks__/vscode';
+// Polyfill File API for Node.js test environment
+// File is a browser API that's not available in Node.js by default
+// This polyfill MUST run before test files are loaded (setupFiles, not setupFilesAfterEnv)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const globalObj = globalThis as any;
 
-// Reset VS Code mocks before each test
-beforeEach(() => {
-  resetAllMocks();
-});
+// Ensure Blob is available (Node 18+ has it globally)
+let BlobConstructor: any = globalObj.Blob;
 
-// Global test timeout (useful for async operations)
-jest.setTimeout(10000);
-
-// Custom matchers can be added here
-expect.extend({
-  /**
-   * Check if a word count is within expected range
-   * Useful for testing word count with slight variations
-   */
-  toBeWithinRange(received: number, floor: number, ceiling: number) {
-    const pass = received >= floor && received <= ceiling;
-    if (pass) {
-      return {
-        message: () => `expected ${received} not to be within range ${floor} - ${ceiling}`,
-        pass: true,
-      };
-    } else {
-      return {
-        message: () => `expected ${received} to be within range ${floor} - ${ceiling}`,
-        pass: false,
-      };
-    }
-  },
-});
-
-// Type declaration for custom matcher
-
-declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
-  namespace jest {
-    interface Matchers<R> {
-      toBeWithinRange(floor: number, ceiling: number): R;
-    }
+if (typeof BlobConstructor === 'undefined') {
+  // Fallback: import from buffer module (Node 18+)
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const buffer = require('buffer');
+    BlobConstructor = buffer.Blob;
+    globalObj.Blob = BlobConstructor;
+  } catch (error) {
+    throw new Error(
+      `Blob is required for File polyfill but is not available: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
+}
+
+// Polyfill File API - set on globalThis for Node.js compatibility
+if (typeof globalObj.File === 'undefined') {
+  globalObj.File = class File extends BlobConstructor {
+    name: string;
+    lastModified: number;
+
+    constructor(fileBits: BlobPart[], fileName: string, options?: FilePropertyBag) {
+      super(fileBits, options);
+      this.name = fileName;
+      this.lastModified = options?.lastModified ?? Date.now();
+    }
+  };
 }

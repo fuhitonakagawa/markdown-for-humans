@@ -245,12 +245,16 @@ describe('normalizeImagePath', () => {
       );
 
       expect(webview.asWebviewUri).toHaveBeenCalledWith(
-        expect.objectContaining({ fsPath: '/test/images/Hero Image.png' })
+        expect.objectContaining({
+          fsPath: expect.stringMatching(/[/\\]test[/\\]images[/\\]Hero Image\.png$/),
+        })
       );
       expect(webview.postMessage).toHaveBeenCalledWith({
         type: 'imageUriResolved',
         requestId: 'req-1',
-        webviewUri: 'webview:/test/images/Hero Image.png',
+        webviewUri: expect.stringMatching(
+          /webview:([A-Za-z]:)?[/\\]test[/\\]images[/\\]Hero Image\.png$/
+        ),
         relativePath: 'images/Hero%20Image.png',
       });
     });
@@ -279,12 +283,16 @@ describe('normalizeImagePath', () => {
       );
 
       expect(webview.asWebviewUri).toHaveBeenCalledWith(
-        expect.objectContaining({ fsPath: '/test/assets/My Diagram.png' })
+        expect.objectContaining({
+          fsPath: expect.stringMatching(/[/\\]test[/\\]assets[/\\]My Diagram\.png$/),
+        })
       );
       expect(webview.postMessage).toHaveBeenCalledWith({
         type: 'imageUriResolved',
         requestId: 'req-2',
-        webviewUri: 'webview:/test/assets/My Diagram.png',
+        webviewUri: expect.stringMatching(
+          /webview:([A-Za-z]:)?[/\\]test[/\\]assets[/\\]My Diagram\.png$/
+        ),
         relativePath: 'file:///test/assets/My%20Diagram.png',
       });
     });

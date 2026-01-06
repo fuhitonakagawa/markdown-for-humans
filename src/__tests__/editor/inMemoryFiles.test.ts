@@ -554,7 +554,9 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
       );
 
       expect(vscode.workspace.fs.createDirectory).toHaveBeenCalledWith(
-        expect.objectContaining({ fsPath: expect.stringContaining('/workspace/docs/images') })
+        expect.objectContaining({
+          fsPath: expect.stringMatching(/([A-Za-z]:)?[/\\]workspace[/\\]docs[/\\]images/),
+        })
       );
       expect(mockWebview.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -605,7 +607,9 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
       );
 
       expect(vscode.workspace.fs.createDirectory).toHaveBeenCalledWith(
-        expect.objectContaining({ fsPath: expect.stringContaining('/workspace/images') })
+        expect.objectContaining({
+          fsPath: expect.stringMatching(/([A-Za-z]:)?[/\\]workspace[/\\]images/),
+        })
       );
       expect(mockWebview.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -644,7 +648,9 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
       );
 
       expect(vscode.workspace.fs.createDirectory).toHaveBeenCalledWith(
-        expect.objectContaining({ fsPath: expect.stringContaining('/workspace/images') })
+        expect.objectContaining({
+          fsPath: expect.stringMatching(/([A-Za-z]:)?[/\\]workspace[/\\]images/),
+        })
       );
       expect(mockWebview.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -668,10 +674,18 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
       (vscode.workspace.fs.writeFile as jest.Mock).mockResolvedValue(undefined);
       (vscode.workspace.fs.stat as jest.Mock).mockImplementation((uri: unknown) => {
         const fsPath = getUriFsPath(uri);
-        if (fsPath === '/workspace/images/test.jpg') {
+        // Normalize path for cross-platform comparison (remove drive letter, normalize separators)
+        const normalizedPath = fsPath.replace(/\\/g, '/').replace(/^[A-Za-z]:/, '');
+        if (
+          normalizedPath === '/workspace/images/test.jpg' ||
+          normalizedPath.endsWith('/workspace/images/test.jpg')
+        ) {
           return Promise.resolve({} as unknown as vscode.FileStat);
         }
-        if (fsPath === '/workspace/images/test-2.jpg') {
+        if (
+          normalizedPath === '/workspace/images/test-2.jpg' ||
+          normalizedPath.endsWith('/workspace/images/test-2.jpg')
+        ) {
           return Promise.reject(new Error('ENOENT'));
         }
         return Promise.reject(new Error(`Unexpected path: ${fsPath}`));
@@ -692,7 +706,9 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
       );
 
       expect(vscode.workspace.fs.writeFile).toHaveBeenCalledWith(
-        expect.objectContaining({ fsPath: '/workspace/images/test-2.jpg' }),
+        expect.objectContaining({
+          fsPath: expect.stringMatching(/([A-Za-z]:)?[/\\]workspace[/\\]images[/\\]test-2\.jpg$/),
+        }),
         expect.any(Uint8Array)
       );
       expect(mockWebview.postMessage).toHaveBeenCalledWith(
@@ -811,10 +827,14 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
       );
 
       expect(vscode.workspace.fs.createDirectory).toHaveBeenCalledWith(
-        expect.objectContaining({ fsPath: expect.stringContaining('/workspace/images') })
+        expect.objectContaining({
+          fsPath: expect.stringMatching(/([A-Za-z]:)?[/\\]workspace[/\\]images/),
+        })
       );
       expect(vscode.workspace.fs.writeFile).toHaveBeenCalledWith(
-        expect.objectContaining({ fsPath: '/workspace/images/pic.png' }),
+        expect.objectContaining({
+          fsPath: expect.stringMatching(/[/\\]workspace[/\\]images[/\\]pic\.png$/),
+        }),
         expect.any(Uint8Array)
       );
       expect(mockWebview.postMessage).toHaveBeenCalledWith(
