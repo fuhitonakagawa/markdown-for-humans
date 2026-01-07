@@ -37,6 +37,7 @@ import { toggleSearchOverlay } from './features/searchOverlay';
 import { showLinkDialog } from './features/linkDialog';
 import { processPasteContent, parseFencedCode } from './utils/pasteHandler';
 import { copySelectionAsMarkdown } from './utils/copyMarkdown';
+import { shouldAutoLink } from './utils/linkValidation';
 import { buildOutlineFromEditor } from './utils/outline';
 import { scrollToHeading } from './utils/scrollToHeading';
 import { collectExportContent, getDocumentTitle } from './utils/exportContent';
@@ -391,6 +392,8 @@ function initializeEditor(initialContent: string) {
           orderedList: false,
           listItem: false,
           listKeymap: false,
+          // Disable StarterKit's Link - we configure our own with shouldAutoLink validation
+          link: false,
           // In Tiptap v3, 'history' was renamed to 'undoRedo'
           undoRedo: {
             depth: 100,
@@ -434,6 +437,7 @@ function initializeEditor(initialContent: string) {
           HTMLAttributes: {
             class: 'markdown-link',
           },
+          shouldAutoLink,
         }),
         CustomImage.configure({
           allowBase64: true, // Allow base64 for preview
