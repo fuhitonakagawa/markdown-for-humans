@@ -100,19 +100,19 @@ Choose your IDE below for installation instructions:
 
 ### True WYSIWYG Editing
 
-![WYSIWYG Editing](https://raw.githubusercontent.com/concretios/markdown-for-humans/main/marketplace-assets/screenshots/Hero%20Image.png)
+![WYSIWYG Editing](https://raw.githubusercontent.com/bhavya-concretio/markdown-for-humans/9465db5258497d9dd0a953491b1e69c78f4e2ad6/marketplace-assets/gifs/basic_introduction.gif)
 
 *See rendered output as you type, no preview pane needed. Focus on your content, not syntax.*
 
 ### Advanced Table Editing
 
-![Table Editing](https://raw.githubusercontent.com/concretios/markdown-for-humans/main/marketplace-assets/screenshots/Rich%20Table%20Editing.png)
+![Table Editing](https://raw.githubusercontent.com/bhavya-concretio/markdown-for-humans/9465db5258497d9dd0a953491b1e69c78f4e2ad6/marketplace-assets/gifs/table_operations_with_right_click_menu.gif)
 
 *Drag column borders to resize, use the toolbar dropdown to add/remove rows and columns, right-click for quick actions.*
 
 ### Mermaid Diagrams
 
-![Mermaid Diagrams](https://raw.githubusercontent.com/concretios/markdown-for-humans/main/marketplace-assets/screenshots/Mermaid%20Diagram%20Support.png)
+![Mermaid Diagrams](https://raw.githubusercontent.com/bhavya-concretio/markdown-for-humans/9465db5258497d9dd0a953491b1e69c78f4e2ad6/marketplace-assets/gifs/mermaid_diagram_with_one_diagram_only.gif)
 
 *Create flowcharts, sequence diagrams, Gantt charts, and more with 15 built-in templates.*
 
@@ -123,6 +123,31 @@ It asks a local folder in workspace to save the same, to keep your MD assets org
 ![Drag Drop Images](https://raw.githubusercontent.com/concretios/markdown-for-humans/main/marketplace-assets/screenshots/Drag%20Drop%20Image%20Insertions.png)
 
 *Just drag images into your document. Resize with handles, view metadata overlay.*
+
+![Large Size Image Suggestion](https://raw.githubusercontent.com/bhavya-concretio/markdown-for-humans/9465db5258497d9dd0a953491b1e69c78f4e2ad6/marketplace-assets/gifs/large_size_image_size_suggestion.gif)
+
+*Get automatic size suggestions for large images to optimize your document.*
+
+![Image Width Adjust](https://github.com/bhavya-concretio/markdown-for-humans/blob/9465db5258497d9dd0a953491b1e69c78f4e2ad6/marketplace-assets/gifs/image_width_adjust.gif)
+
+*Adjust image width with intuitive resize handles for perfect layout control.*
+
+![Image Rename Functionality]( https://raw.githubusercontent.com/bhavya-concretio/markdown-for-humans/9465db5258497d9dd0a953491b1e69c78f4e2ad6/marketplace-assets/gifs/image_rename_functionality.gif)
+
+*Rename images directly from the editor to keep your assets organized.*
+
+### Document Outline
+
+![Document Outline](https://raw.githubusercontent.com/bhavya-concretio/markdown-for-humans/9465db5258497d9dd0a953491b1e69c78f4e2ad6/marketplace-assets/gifs/document_outline.gif)
+
+*Navigate your document quickly with sidebar outline showing all headings for instant access.*
+
+### GitHub Alerts
+
+![GitHub Alerts](https://raw.githubusercontent.com/bhavya-concretio/markdown-for-humans/9465db5258497d9dd0a953491b1e69c78f4e2ad6/marketplace-assets/gifs/github_alerts.gif)
+
+*Create beautiful GitHub-style alert boxes for notes, warnings, tips, and important information.*
+
 
 ---
 
