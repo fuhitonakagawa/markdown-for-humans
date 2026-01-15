@@ -1159,6 +1159,12 @@ export function showLinkDialog(editor: Editor): void {
 
   updateMode('url', urlInput, filtersContainer);
 
+  // Restore URL values if editing existing link (updateMode clears them)
+  if (currentUrl) {
+    urlInput.value = currentUrl;
+    actualLinkPath = currentUrl;
+  }
+
   // Close autocomplete initially
   closeAutocomplete();
 
