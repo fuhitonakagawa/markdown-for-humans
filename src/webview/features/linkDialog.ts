@@ -11,9 +11,30 @@
 import { getMarkRange, Editor } from '@tiptap/core';
 import { TextSelection } from 'prosemirror-state';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
+import { buildOutlineFromEditor } from '../utils/outline';
 
 type Range = { from: number; to: number };
 type ParentContext = { parentStart: number; parentText: string };
+type LinkMode = 'url' | 'file' | 'headings';
+
+interface FileFilterState {
+  all: boolean;
+  md: boolean;
+  images: boolean;
+  code: boolean;
+  config: boolean;
+}
+
+interface FileSearchResult {
+  filename: string;
+  path: string;
+}
+
+interface HeadingResult {
+  text: string;
+  level: number;
+  slug: string;
+}
 
 /**
  * Link Dialog state
@@ -26,7 +47,91 @@ let initialLinkRange: Range | null = null;
 let previousSelection: Range | null = null;
 let shouldRestoreSelectionOnHide = true;
 
+// Enhanced dialog state
+let currentMode: LinkMode = 'url';
+let filterState: FileFilterState = { all: true, md: true, images: true, code: true, config: true };
+let autocompleteDropdown: HTMLElement | null = null;
+let selectedAutocompleteIndex: number | null = null;
+let fileSearchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let fileSearchRequestId = 0;
+let actualLinkPath: string | null = null; // Store actual path separately from displayed value
+
 const isWhitespace = (char: string) => /\s/.test(char);
+
+/**
+ * Generate GFM-style slug from heading text with duplicate handling
+ */
+function generateHeadingSlug(text: string, existingSlugs: Set<string>): string {
+  const slug = text
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  let finalSlug = slug;
+  let counter = 1;
+  while (existingSlugs.has(finalSlug)) {
+    finalSlug = `${slug}-${counter}`;
+    counter++;
+  }
+
+  existingSlugs.add(finalSlug);
+  return finalSlug;
+}
+
+/**
+ * Load filter state from localStorage
+ */
+function loadFilterState(): FileFilterState {
+  try {
+    const stored = localStorage.getItem('markdownForHumans.linkFileFilters');
+    if (stored) {
+      const parsed = JSON.parse(stored) as Partial<FileFilterState>;
+      return {
+        all: typeof parsed.all === 'boolean' ? parsed.all : true,
+        md: typeof parsed.md === 'boolean' ? parsed.md : true,
+        images: typeof parsed.images === 'boolean' ? parsed.images : true,
+        code: typeof parsed.code === 'boolean' ? parsed.code : true,
+        config: typeof parsed.config === 'boolean' ? parsed.config : true,
+      };
+    }
+  } catch (error) {
+    console.warn('[MD4H] Failed to load filter state from localStorage', error);
+  }
+  return { all: true, md: true, images: true, code: true, config: true };
+}
+
+/**
+ * Save filter state to localStorage
+ */
+function saveFilterState(state: FileFilterState): void {
+  try {
+    localStorage.setItem('markdownForHumans.linkFileFilters', JSON.stringify(state));
+  } catch (error) {
+    console.warn('[MD4H] Failed to save filter state to localStorage', error);
+  }
+}
+
+/**
+ * Close autocomplete dropdown
+ */
+function closeAutocomplete(): void {
+  if (autocompleteDropdown) {
+    autocompleteDropdown.style.display = 'none';
+    selectedAutocompleteIndex = null;
+  }
+}
+
+/**
+ * Escape HTML to prevent XSS
+ */
+function escapeHtml(text: string): string {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
 
 const getParentContext = (
   range: Range | null,
@@ -224,71 +329,368 @@ const setSelectionHighlight = (range: Range | null) => {
   }
 };
 
-const positionPopover = (panel: HTMLElement) => {
-  if (!currentEditor || !workingRange) return;
-  const view = currentEditor.view;
-  if (!view || typeof view.coordsAtPos !== 'function') return;
+/**
+ * Center the modal dialog on screen
+ */
+const centerModal = (panel: HTMLElement) => {
+  panel.style.position = 'fixed';
+  panel.style.top = '50%';
+  panel.style.left = '50%';
+  panel.style.transform = 'translate(-50%, -50%)';
+  panel.style.margin = '0';
+};
 
-  const pos = Math.max(
-    Math.min(Math.floor((workingRange.from + workingRange.to) / 2), workingRange.to),
-    workingRange.from
-  );
+// Note: Resize/scroll listeners removed - modal uses fixed positioning (centerModal)
+// which doesn't need repositioning on window resize/scroll
 
-  let coords;
-  try {
-    coords = view.coordsAtPos(pos);
-  } catch (error) {
-    console.warn('[MD4H] coordsAtPos failed for link dialog', error);
+/**
+ * Create autocomplete dropdown element
+ */
+function createAutocompleteDropdown(urlInput: HTMLInputElement): HTMLElement {
+  const dropdown = document.createElement('div');
+  dropdown.className = 'link-dialog-autocomplete';
+  dropdown.style.display = 'none';
+  dropdown.setAttribute('role', 'listbox');
+
+  const updatePosition = () => {
+    if (!urlInput || !dropdown) return;
+    const inputRect = urlInput.getBoundingClientRect();
+    const dialogPanel = urlInput.closest('.export-settings-overlay-panel') as HTMLElement;
+
+    if (dialogPanel) {
+      // Position relative to dialog panel - ensure dropdown stays within dialog bounds
+      const panelRect = dialogPanel.getBoundingClientRect();
+      const relativeTop = inputRect.bottom - panelRect.top + 4;
+      const relativeLeft = inputRect.left - panelRect.left;
+
+      // Calculate available space from input to bottom of modal
+      const availableHeight = panelRect.bottom - inputRect.bottom - 8; // 8px padding from bottom
+      const maxDropdownHeight = Math.min(300, Math.max(150, availableHeight)); // At least 150px, max 300px
+
+      dropdown.style.position = 'absolute';
+      dropdown.style.top = `${relativeTop}px`;
+      dropdown.style.left = `${relativeLeft}px`;
+      dropdown.style.maxHeight = `${maxDropdownHeight}px`;
+
+      // Limit width to not exceed dialog panel width
+      const maxWidth = Math.min(520, inputRect.width, panelRect.width - relativeLeft - 8);
+      dropdown.style.width = `${maxWidth}px`;
+      dropdown.style.maxWidth = `${maxWidth}px`;
+    } else {
+      // Fallback: position relative to viewport
+      dropdown.style.position = 'fixed';
+      dropdown.style.top = `${inputRect.bottom + 4}px`;
+      dropdown.style.left = `${inputRect.left}px`;
+      dropdown.style.width = `${Math.min(520, inputRect.width)}px`;
+      dropdown.style.maxHeight = '300px';
+    }
+  };
+
+  // Update position when input is focused or when dropdown is shown
+  urlInput.addEventListener('focus', updatePosition);
+  window.addEventListener('resize', updatePosition);
+  window.addEventListener('scroll', updatePosition, true);
+
+  // Store update function for later use
+  (dropdown as any)._updatePosition = updatePosition;
+
+  return dropdown;
+}
+
+/**
+ * Update autocomplete dropdown with results
+ */
+function updateAutocompleteDropdown(
+  dropdown: HTMLElement,
+  results: (FileSearchResult | HeadingResult)[],
+  urlInput: HTMLInputElement
+): void {
+  dropdown.innerHTML = '';
+  selectedAutocompleteIndex = null;
+
+  if (results.length === 0) {
+    const emptyMsg = document.createElement('div');
+    emptyMsg.className = 'link-dialog-autocomplete-empty';
+    emptyMsg.textContent =
+      currentMode === 'file' ? 'No files found' : 'No headings in this document';
+    dropdown.appendChild(emptyMsg);
+    dropdown.style.display = 'block';
     return;
   }
 
-  const panelRect = panel.getBoundingClientRect();
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
-  const gutter = 12;
-  const lineHeight =
-    parseFloat(getComputedStyle(document.documentElement).lineHeight || '20') || 20;
-  const offset = lineHeight * 1.5;
+  results.forEach((result, index) => {
+    const item = document.createElement('div');
+    item.className = 'link-dialog-autocomplete-item';
+    item.setAttribute('role', 'option');
+    item.setAttribute('data-index', index.toString());
 
-  const preferredTop = coords.top - panelRect.height - offset;
-  const fallbackTop = coords.bottom + offset;
-  const top = preferredTop > gutter ? preferredTop : fallbackTop;
+    if (currentMode === 'file') {
+      const fileResult = result as FileSearchResult;
+      item.className = 'link-dialog-autocomplete-item link-dialog-autocomplete-item-file';
+      item.innerHTML = `
+        <div class="link-dialog-autocomplete-content">
+          <div class="link-dialog-autocomplete-filename">${escapeHtml(fileResult.filename)}</div>
+          <div class="link-dialog-autocomplete-item-path" title="${escapeHtml(fileResult.path)}">${escapeHtml(fileResult.path)}</div>
+        </div>
+      `;
+      item.onclick = () => {
+        // Normalize path: use forward slashes and ensure it starts with ./ for relative paths
+        let normalizedPath = fileResult.path.replace(/\\/g, '/');
 
-  const preferredLeft = coords.left - panelRect.width / 2;
-  const clampedLeft = Math.max(
-    gutter,
-    Math.min(preferredLeft, viewportWidth - panelRect.width - gutter)
-  );
-  const clampedTop = Math.max(gutter, Math.min(top, viewportHeight - panelRect.height - gutter));
+        // Ensure relative paths start with ./ (unless already starting with ./ or ../ or absolute)
+        if (
+          !normalizedPath.startsWith('./') &&
+          !normalizedPath.startsWith('../') &&
+          !normalizedPath.startsWith('/') &&
+          !normalizedPath.match(/^[A-Za-z]:/)
+        ) {
+          // Not Windows absolute path
+          normalizedPath = './' + normalizedPath;
+        }
 
-  panel.style.position = 'absolute';
-  panel.style.left = `${clampedLeft}px`;
-  panel.style.top = `${clampedTop}px`;
-};
+        // Store actual path internally
+        actualLinkPath = normalizedPath;
+        // Show only filename in URL input
+        urlInput.value = fileResult.filename;
+        closeAutocomplete();
+        urlInput.focus();
+      };
+    } else {
+      const headingResult = result as HeadingResult;
+      // Truncate long heading text for display
+      const maxHeadingLength = 60;
+      const displayText =
+        headingResult.text.length > maxHeadingLength
+          ? headingResult.text.substring(0, maxHeadingLength) + '...'
+          : headingResult.text;
 
-window.addEventListener('resize', () => {
-  if (!isVisible || !linkDialogElement) return;
-  const panel = linkDialogElement.querySelector(
-    '.export-settings-overlay-panel'
-  ) as HTMLElement | null;
-  if (panel) {
-    positionPopover(panel);
-  }
-});
-
-window.addEventListener(
-  'scroll',
-  () => {
-    if (!isVisible || !linkDialogElement) return;
-    const panel = linkDialogElement.querySelector(
-      '.export-settings-overlay-panel'
-    ) as HTMLElement | null;
-    if (panel) {
-      positionPopover(panel);
+      item.className = 'link-dialog-autocomplete-item link-dialog-autocomplete-item-heading';
+      item.innerHTML = `
+        <div class="link-dialog-autocomplete-content">
+          <div class="link-dialog-autocomplete-filename" title="${escapeHtml(headingResult.text)}">
+            ${escapeHtml(displayText)}<span class="link-dialog-autocomplete-level"> : H${headingResult.level}</span>
+          </div>
+        </div>
+      `;
+      item.onclick = () => {
+        // Store actual slug path internally
+        actualLinkPath = `#${headingResult.slug}`;
+        // Show only heading text (truncated if needed) in URL input
+        const displayText =
+          headingResult.text.length > 50
+            ? headingResult.text.substring(0, 50) + '...'
+            : headingResult.text;
+        urlInput.value = displayText;
+        closeAutocomplete();
+        urlInput.focus();
+      };
     }
-  },
-  true
-);
+
+    item.onmouseenter = () => {
+      selectedAutocompleteIndex = index;
+      updateAutocompleteHighlight(dropdown);
+    };
+
+    dropdown.appendChild(item);
+  });
+
+  dropdown.style.display = 'block';
+
+  // Update position when showing results
+  if ((dropdown as any)._updatePosition) {
+    (dropdown as any)._updatePosition();
+  }
+
+  updateAutocompleteHighlight(dropdown);
+}
+
+/**
+ * Update highlight for selected autocomplete item
+ */
+function updateAutocompleteHighlight(dropdown: HTMLElement): void {
+  const items = dropdown.querySelectorAll('.link-dialog-autocomplete-item');
+  items.forEach((item, index) => {
+    if (index === selectedAutocompleteIndex) {
+      item.classList.add('link-dialog-autocomplete-item-highlighted');
+      item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    } else {
+      item.classList.remove('link-dialog-autocomplete-item-highlighted');
+    }
+  });
+}
+
+/**
+ * Handle keyboard navigation in autocomplete
+ */
+function handleAutocompleteKeyboard(
+  e: KeyboardEvent,
+  dropdown: HTMLElement,
+  urlInput: HTMLInputElement
+): boolean {
+  if (!dropdown || dropdown.style.display === 'none') return false;
+
+  const items = dropdown.querySelectorAll('.link-dialog-autocomplete-item');
+  if (items.length === 0) return false;
+
+  switch (e.key) {
+    case 'ArrowDown':
+      e.preventDefault();
+      selectedAutocompleteIndex =
+        selectedAutocompleteIndex === null ? 0 : (selectedAutocompleteIndex + 1) % items.length;
+      updateAutocompleteHighlight(dropdown);
+      return true;
+
+    case 'ArrowUp':
+      e.preventDefault();
+      selectedAutocompleteIndex =
+        selectedAutocompleteIndex === null || selectedAutocompleteIndex === 0
+          ? items.length - 1
+          : selectedAutocompleteIndex - 1;
+      updateAutocompleteHighlight(dropdown);
+      return true;
+
+    case 'Enter':
+      if (selectedAutocompleteIndex !== null && selectedAutocompleteIndex < items.length) {
+        e.preventDefault();
+        (items[selectedAutocompleteIndex] as HTMLElement).click();
+        return true;
+      }
+      return false;
+
+    case 'Escape':
+      e.preventDefault();
+      closeAutocomplete();
+      urlInput.focus();
+      return true;
+
+    default:
+      return false;
+  }
+}
+
+/**
+ * Handle file search with debouncing
+ */
+function handleFileSearch(query: string, filters: FileFilterState): void {
+  if (fileSearchDebounceTimer) {
+    clearTimeout(fileSearchDebounceTimer);
+  }
+
+  const trimmedQuery = query.trim();
+
+  // If query is empty, show empty state but don't close dropdown immediately
+  if (trimmedQuery.length < 1) {
+    if (autocompleteDropdown) {
+      const emptyMsg = document.createElement('div');
+      emptyMsg.className = 'link-dialog-autocomplete-empty';
+      emptyMsg.textContent = 'Start typing to search files...';
+      autocompleteDropdown.innerHTML = '';
+      autocompleteDropdown.appendChild(emptyMsg);
+      autocompleteDropdown.style.display = 'block';
+    }
+    return;
+  }
+
+  fileSearchDebounceTimer = setTimeout(() => {
+    const requestId = ++fileSearchRequestId;
+    const vscode = (window as any).vscode;
+    if (vscode && typeof vscode.postMessage === 'function') {
+      console.log('[MD4H] Sending file search request:', {
+        query: trimmedQuery,
+        filters,
+        requestId,
+      });
+      vscode.postMessage({
+        type: 'searchFiles',
+        query: trimmedQuery,
+        filters,
+        requestId,
+      });
+    } else {
+      console.warn('[MD4H] vscode API not available for file search');
+    }
+  }, 300);
+}
+
+/**
+ * Handle heading extraction and display
+ */
+function handleHeadingExtraction(editor: Editor, query: string, urlInput: HTMLInputElement): void {
+  try {
+    const outline = buildOutlineFromEditor(editor);
+    const existingSlugs = new Set<string>();
+    const headingResults: HeadingResult[] = outline.map(entry => ({
+      text: entry.text,
+      level: entry.level,
+      slug: generateHeadingSlug(entry.text, existingSlugs),
+    }));
+
+    const filtered = query.trim()
+      ? headingResults.filter(
+          h =>
+            h.text.toLowerCase().includes(query.toLowerCase()) ||
+            h.slug.toLowerCase().includes(query.toLowerCase())
+        )
+      : headingResults;
+
+    const limited = filtered.slice(0, 20);
+
+    if (autocompleteDropdown) {
+      updateAutocompleteDropdown(autocompleteDropdown, limited, urlInput);
+    }
+  } catch (error) {
+    console.error('[MD4H] Failed to extract headings', error);
+    closeAutocomplete();
+  }
+}
+
+/**
+ * Update mode and UI accordingly
+ */
+function updateMode(
+  mode: LinkMode,
+  urlInput: HTMLInputElement,
+  filtersContainer: HTMLElement | null
+): void {
+  currentMode = mode;
+
+  // Update URL label text based on mode
+  const urlLabelText = linkDialogElement?.querySelector(
+    '#link-url-label-text'
+  ) as HTMLElement | null;
+
+  switch (mode) {
+    case 'url':
+      urlInput.placeholder = 'https://example.com';
+      if (urlLabelText) {
+        urlLabelText.textContent = 'URL';
+      }
+      break;
+    case 'file':
+      urlInput.placeholder = 'Start typing to search files...';
+      if (urlLabelText) {
+        urlLabelText.textContent = 'File';
+      }
+      break;
+    case 'headings':
+      urlInput.placeholder = 'Select a heading from the list below';
+      if (urlLabelText) {
+        urlLabelText.textContent = 'Heading';
+      }
+      break;
+  }
+
+  if (filtersContainer) {
+    filtersContainer.style.display = mode === 'file' ? 'block' : 'none';
+  }
+
+  urlInput.value = '';
+  actualLinkPath = null; // Clear stored path when mode changes
+  closeAutocomplete();
+
+  // Don't show headings immediately - wait for input focus
+  // Headings will be shown when URL input receives focus
+}
 
 /**
  * Create the Link Dialog element
@@ -378,11 +780,28 @@ export function createLinkDialog(): HTMLElement {
       </div>
       <p class="export-settings-hint">The text that will be shown in the document</p>
     </div>
-    <div class="export-settings-section" style="margin-bottom: 24px;">
-      <label class="export-settings-label" for="link-url-input">
-        URL
+    <div class="export-settings-section" style="margin-bottom: 16px;">
+      <label class="export-settings-label">Type</label>
+      <div class="link-dialog-mode-group">
+        <label class="link-dialog-mode-option">
+          <input type="radio" name="link-mode" value="url" id="link-mode-url" checked />
+          <span>URL</span>
+        </label>
+        <label class="link-dialog-mode-option">
+          <input type="radio" name="link-mode" value="file" id="link-mode-file" />
+          <span>File</span>
+        </label>
+        <label class="link-dialog-mode-option">
+          <input type="radio" name="link-mode" value="headings" id="link-mode-headings" />
+          <span>Headings</span>
+        </label>
+      </div>
+    </div>
+    <div class="export-settings-section" style="margin-bottom: 16px; position: relative;">
+      <label class="export-settings-label" for="link-url-input" id="link-url-label">
+        <span id="link-url-label-text">URL</span>
         <input
-          type="url"
+          type="text"
           id="link-url-input"
           class="export-settings-select"
           style="padding: 8px 12px;"
@@ -391,30 +810,53 @@ export function createLinkDialog(): HTMLElement {
       </label>
       <p class="export-settings-hint">The web address or file path</p>
     </div>
-    <div style="display: flex; gap: 12px; justify-content: space-between;">
+    <div class="export-settings-section" id="link-filters-container" style="margin-bottom: 16px; display: none;">
+      <label class="export-settings-label">Filter</label>
+      <div class="link-dialog-filters">
+        <label class="link-dialog-filter-checkbox">
+          <input type="checkbox" id="link-filter-all" checked />
+          <span>All</span>
+        </label>
+        <label class="link-dialog-filter-checkbox">
+          <input type="checkbox" id="link-filter-md" checked />
+          <span>MD</span>
+        </label>
+        <label class="link-dialog-filter-checkbox">
+          <input type="checkbox" id="link-filter-images" checked />
+          <span>Images</span>
+        </label>
+        <label class="link-dialog-filter-checkbox">
+          <input type="checkbox" id="link-filter-code" checked />
+          <span>Code</span>
+        </label>
+        <label class="link-dialog-filter-checkbox">
+          <input type="checkbox" id="link-filter-config" checked />
+          <span>Config</span>
+        </label>
+      </div>
+    </div>
+    <div style="display: flex; gap: 12px; justify-content: flex-end; align-items: center;">
       <button
         id="link-remove-btn"
         class="export-settings-select"
-        style="padding: 8px 16px; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: none; cursor: pointer; border-radius: 4px;"
+        style="padding: 8px 16px; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: none; cursor: pointer; border-radius: 4px; margin-right: auto;"
       >
         Remove Link
       </button>
-      <div style="display: flex; gap: 12px;">
-        <button
-          id="link-cancel-btn"
-          class="export-settings-select"
-          style="padding: 8px 24px; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: none; cursor: pointer; border-radius: 4px;"
-        >
-          Cancel
-        </button>
-        <button
-          id="link-ok-btn"
-          class="export-settings-select"
-          style="padding: 8px 24px; background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; cursor: pointer; border-radius: 4px;"
-        >
-          OK
-        </button>
-      </div>
+      <button
+        id="link-cancel-btn"
+        class="export-settings-select"
+        style="padding: 8px 24px; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: none; cursor: pointer; border-radius: 4px;"
+      >
+        Cancel
+      </button>
+      <button
+        id="link-ok-btn"
+        class="export-settings-select"
+        style="padding: 8px 24px; background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; cursor: pointer; border-radius: 4px;"
+      >
+        OK
+      </button>
     </div>
   `;
 
@@ -430,6 +872,156 @@ export function createLinkDialog(): HTMLElement {
     '#link-expand-right-btn'
   ) as HTMLButtonElement | null;
   const trimRightBtn = content.querySelector('#link-trim-right-btn') as HTMLButtonElement | null;
+  const filtersContainer = content.querySelector('#link-filters-container') as HTMLElement | null;
+
+  // Create autocomplete dropdown
+  if (urlInput) {
+    autocompleteDropdown = createAutocompleteDropdown(urlInput);
+    content.appendChild(autocompleteDropdown);
+  }
+
+  // Load filter state
+  filterState = loadFilterState();
+
+  // Setup filter checkboxes
+  const filterAll = content.querySelector('#link-filter-all') as HTMLInputElement;
+  const filterMd = content.querySelector('#link-filter-md') as HTMLInputElement;
+  const filterImages = content.querySelector('#link-filter-images') as HTMLInputElement;
+  const filterCode = content.querySelector('#link-filter-code') as HTMLInputElement;
+  const filterConfig = content.querySelector('#link-filter-config') as HTMLInputElement;
+
+  // Initialize filter checkboxes
+  filterAll.checked = filterState.all;
+  filterMd.checked = filterState.md;
+  filterImages.checked = filterState.images;
+  filterCode.checked = filterState.code;
+  filterConfig.checked = filterState.config;
+
+  // Update filter checkbox states based on "All" checkbox
+  const updateFilterCheckboxes = () => {
+    const allChecked = filterAll.checked;
+    filterMd.disabled = allChecked;
+    filterImages.disabled = allChecked;
+    filterCode.disabled = allChecked;
+    filterConfig.disabled = allChecked;
+
+    if (allChecked) {
+      filterMd.checked = true;
+      filterImages.checked = true;
+      filterCode.checked = true;
+      filterConfig.checked = true;
+    }
+
+    filterState = {
+      all: filterAll.checked,
+      md: filterMd.checked,
+      images: filterImages.checked,
+      code: filterCode.checked,
+      config: filterConfig.checked,
+    };
+    saveFilterState(filterState);
+
+    if (currentMode === 'file' && urlInput.value.trim()) {
+      handleFileSearch(urlInput.value.trim(), filterState);
+    }
+  };
+
+  filterAll.addEventListener('change', () => {
+    updateFilterCheckboxes();
+  });
+
+  [filterMd, filterImages, filterCode, filterConfig].forEach(checkbox => {
+    checkbox.addEventListener('change', () => {
+      if (!checkbox.checked) {
+        filterAll.checked = false;
+      }
+      if (filterMd.checked && filterImages.checked && filterCode.checked && filterConfig.checked) {
+        filterAll.checked = true;
+      }
+      updateFilterCheckboxes();
+    });
+  });
+
+  // Setup radio buttons for mode switching
+  const modeUrl = content.querySelector('#link-mode-url') as HTMLInputElement;
+  const modeFile = content.querySelector('#link-mode-file') as HTMLInputElement;
+  const modeHeadings = content.querySelector('#link-mode-headings') as HTMLInputElement;
+
+  modeUrl.addEventListener('change', () => {
+    if (modeUrl.checked) {
+      updateMode('url', urlInput, filtersContainer);
+    }
+  });
+
+  modeFile.addEventListener('change', () => {
+    if (modeFile.checked) {
+      updateMode('file', urlInput, filtersContainer);
+    }
+  });
+
+  modeHeadings.addEventListener('change', () => {
+    if (modeHeadings.checked) {
+      updateMode('headings', urlInput, filtersContainer);
+    }
+  });
+
+  // Setup URL input handlers
+  urlInput.addEventListener('focus', () => {
+    if (currentMode === 'headings' && currentEditor) {
+      // Show headings when input is focused in Headings mode
+      handleHeadingExtraction(currentEditor, urlInput.value.trim(), urlInput);
+    } else if (currentMode === 'file') {
+      // Show placeholder for file mode
+      if (autocompleteDropdown && !urlInput.value.trim()) {
+        const emptyMsg = document.createElement('div');
+        emptyMsg.className = 'link-dialog-autocomplete-empty';
+        emptyMsg.textContent = 'Start typing to search files...';
+        autocompleteDropdown.innerHTML = '';
+        autocompleteDropdown.appendChild(emptyMsg);
+        autocompleteDropdown.style.display = 'block';
+      }
+    }
+  });
+
+  urlInput.addEventListener('input', () => {
+    if (currentMode === 'file') {
+      const query = urlInput.value.trim();
+      if (query.length >= 1) {
+        handleFileSearch(query, filterState);
+      } else {
+        // Show placeholder message when input is empty
+        if (autocompleteDropdown) {
+          const emptyMsg = document.createElement('div');
+          emptyMsg.className = 'link-dialog-autocomplete-empty';
+          emptyMsg.textContent = 'Start typing to search files...';
+          autocompleteDropdown.innerHTML = '';
+          autocompleteDropdown.appendChild(emptyMsg);
+          autocompleteDropdown.style.display = 'block';
+        }
+      }
+    } else if (currentMode === 'headings' && currentEditor) {
+      handleHeadingExtraction(currentEditor, urlInput.value.trim(), urlInput);
+    } else {
+      closeAutocomplete();
+    }
+  });
+
+  urlInput.addEventListener('keydown', e => {
+    if (autocompleteDropdown && handleAutocompleteKeyboard(e, autocompleteDropdown, urlInput)) {
+      return;
+    }
+  });
+
+  // Close autocomplete when clicking outside
+  document.addEventListener('click', e => {
+    if (
+      autocompleteDropdown &&
+      !autocompleteDropdown.contains(e.target as Node) &&
+      urlInput !== e.target
+    ) {
+      closeAutocomplete();
+    }
+  });
 
   const boundaryButtons = [
     { button: trimLeftBtn, direction: 'left' as const, action: 'shrink' as const },
@@ -444,7 +1036,8 @@ export function createLinkDialog(): HTMLElement {
   });
 
   okBtn.onclick = () => {
-    const url = urlInput.value.trim();
+    // Use actualLinkPath if available (from file/heading selection), otherwise use urlInput.value
+    const url = actualLinkPath || urlInput.value.trim();
     const text = textInput.value;
 
     if (!url) {
@@ -549,6 +1142,25 @@ export function showLinkDialog(editor: Editor): void {
   // Pre-fill inputs
   textInput.value = selectedText || '';
   urlInput.value = currentUrl || '';
+  actualLinkPath = currentUrl || null; // Set actualLinkPath if editing existing link
+
+  // Initialize mode (default to URL)
+  currentMode = 'url';
+  const modeUrl = linkDialogElement.querySelector('#link-mode-url') as HTMLInputElement;
+  const modeFile = linkDialogElement.querySelector('#link-mode-file') as HTMLInputElement;
+  const modeHeadings = linkDialogElement.querySelector('#link-mode-headings') as HTMLInputElement;
+  const filtersContainer = linkDialogElement.querySelector(
+    '#link-filters-container'
+  ) as HTMLElement | null;
+
+  if (modeUrl) modeUrl.checked = true;
+  if (modeFile) modeFile.checked = false;
+  if (modeHeadings) modeHeadings.checked = false;
+
+  updateMode('url', urlInput, filtersContainer);
+
+  // Close autocomplete initially
+  closeAutocomplete();
 
   // Show overlay
   linkDialogElement.classList.add('visible');
@@ -570,7 +1182,7 @@ export function showLinkDialog(editor: Editor): void {
     }
 
     if (panelElement) {
-      positionPopover(panelElement);
+      centerModal(panelElement);
     }
   });
 }
@@ -584,6 +1196,15 @@ export function hideLinkDialog(): void {
   const originalSelection = previousSelection;
 
   if (!linkDialogElement) return;
+
+  // Clean up
+  if (fileSearchDebounceTimer) {
+    clearTimeout(fileSearchDebounceTimer);
+    fileSearchDebounceTimer = null;
+  }
+  closeAutocomplete();
+  currentMode = 'url';
+  actualLinkPath = null; // Clear stored path when dialog is hidden
 
   linkDialogElement.classList.remove('visible');
   linkDialogElement.style.display = 'none';
@@ -613,4 +1234,34 @@ export function hideLinkDialog(): void {
  */
 export function isLinkDialogVisible(): boolean {
   return isVisible;
+}
+
+/**
+ * Handle file search results from extension
+ */
+export function handleFileSearchResults(results: FileSearchResult[], requestId: number): void {
+  console.log('[MD4H] Received file search results:', {
+    resultsCount: results.length,
+    requestId,
+    currentRequestId: fileSearchRequestId,
+  });
+
+  if (requestId !== fileSearchRequestId) {
+    console.log('[MD4H] Ignoring outdated search results (requestId mismatch)');
+    return;
+  }
+
+  if (!autocompleteDropdown || !linkDialogElement) {
+    console.warn('[MD4H] Autocomplete dropdown or dialog element not available');
+    return;
+  }
+
+  const urlInput = linkDialogElement.querySelector('#link-url-input') as HTMLInputElement;
+  if (!urlInput) {
+    console.warn('[MD4H] URL input not found');
+    return;
+  }
+
+  console.log('[MD4H] Updating autocomplete dropdown with', results.length, 'results');
+  updateAutocompleteDropdown(autocompleteDropdown, results, urlInput);
 }

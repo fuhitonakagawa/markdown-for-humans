@@ -1695,9 +1695,9 @@
     bottom: 0;
     z-index: 1000;
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: center;
-    padding-top: 100px;
+    padding: 0;
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.2s ease, visibility 0.2s ease;
@@ -1714,18 +1714,21 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: var(--vscode-editor-background);
-    opacity: 0.9;
-    backdrop-filter: blur(2px);
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
   }
   
   .export-settings-overlay-panel {
     position: relative;
     z-index: 1;
-    background-color: var(--vscode-editor-background);
-    border: 1px solid var(--md-border);
+    background-color: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+    border: 2px solid var(--vscode-widget-border, var(--md-border));
     border-radius: 12px;
-    box-shadow: 0 8px 32px var(--vscode-widget-shadow);
+    box-shadow: 
+      0 16px 48px rgba(0, 0, 0, 0.4),
+      0 0 0 1px rgba(255, 255, 255, 0.1),
+      0 8px 32px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.3));
     max-width: 500px;
     width: min(90vw, 500px);
     display: flex;
@@ -1738,7 +1741,8 @@
     align-items: center;
     justify-content: space-between;
     padding: 16px 20px;
-    border-bottom: 1px solid var(--md-border);
+    border-bottom: 1px solid var(--vscode-widget-border, var(--md-border));
+    background-color: var(--vscode-editorWidget-background, var(--vscode-editor-background));
     flex-shrink: 0;
   }
   
@@ -1746,7 +1750,7 @@
     margin: 0;
     font-size: 18px;
     font-weight: 600;
-    color: var(--md-foreground);
+    color: var(--vscode-editorWidget-foreground, var(--md-foreground));
   }
   
   .export-settings-overlay-close {
@@ -1841,15 +1845,168 @@
   }
   
   /* ============================================
-     Export & Settings Toolbar Buttons
+     Link Dialog Enhanced Features
      ============================================ */
   
-  .toolbar-button.settings-button {
-    /* Settings button inherits base toolbar button styles */
+  /* Radio button group for mode selection */
+  .link-dialog-mode-group {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
   }
   
-  .toolbar-dropdown {
-    /* Export dropdown inherits base dropdown styles */
+  .link-dialog-mode-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background-color 0.15s ease;
+  }
+  
+  .link-dialog-mode-option:hover {
+    background-color: var(--md-hover-bg);
+  }
+  
+  .link-dialog-mode-option input[type="radio"] {
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--vscode-button-background);
+  }
+  
+  .link-dialog-mode-option span {
+    font-size: 13px;
+    color: var(--md-foreground);
+  }
+  
+  /* Filter checkboxes */
+  .link-dialog-filters {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  
+  .link-dialog-filter-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background-color 0.15s ease;
+  }
+  
+  .link-dialog-filter-checkbox:hover:not(:has(input:disabled)) {
+    background-color: var(--md-hover-bg);
+  }
+  
+  .link-dialog-filter-checkbox input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+    accent-color: var(--vscode-button-background);
+  }
+  
+  .link-dialog-filter-checkbox input[type="checkbox"]:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  
+  .link-dialog-filter-checkbox span {
+    font-size: 13px;
+    color: var(--md-foreground);
+  }
+  
+  .link-dialog-filter-checkbox:has(input:disabled) {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  /* Autocomplete dropdown */
+  .link-dialog-autocomplete {
+    position: absolute;
+    z-index: 1001; /* Above input but below modal backdrop (1000) */
+    background-color: var(--vscode-editorWidget-background);
+    border: 1px solid var(--md-border);
+    border-radius: 4px;
+    box-shadow: 0 4px 12px var(--vscode-widget-shadow);
+    max-height: 300px; /* Default max-height, will be adjusted dynamically */
+    overflow-y: auto;
+    margin-top: 4px;
+    max-width: 100%; /* Ensure dropdown doesn't exceed dialog width */
+  }
+  
+  .link-dialog-autocomplete-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+    border-bottom: 1px solid var(--md-border);
+  }
+  
+  .link-dialog-autocomplete-item:last-child {
+    border-bottom: none;
+  }
+  
+  .link-dialog-autocomplete-item:hover,
+  .link-dialog-autocomplete-item-highlighted {
+    background-color: var(--md-hover-bg);
+  }
+  
+  .link-dialog-autocomplete-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .link-dialog-autocomplete-item-file {
+    border-left: 3px solid var(--vscode-textLink-foreground, #4a9eff);
+  }
+  
+  .link-dialog-autocomplete-item-heading {
+    border-left: 3px solid var(--vscode-textBlockQuote-border, #808080);
+  }
+  
+  .link-dialog-autocomplete-filename {
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--md-foreground);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  
+  .link-dialog-autocomplete-level {
+    font-weight: normal;
+    color: var(--md-muted);
+    flex-shrink: 0;
+  }
+  
+  .link-dialog-autocomplete-item-path {
+    font-size: 12px;
+    color: var(--md-muted);
+    max-width: calc(100% - 60px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .link-dialog-autocomplete-empty {
+    padding: 16px;
+    text-align: center;
+    color: var(--md-muted);
+    font-size: 13px;
   }
   
   /* ============================================
@@ -2137,20 +2294,10 @@
     margin: 4px 0;
   }
 
-  /* Keep menu button and hover active when menu is open */
-  .image-wrapper:has(.image-context-menu[style*="block"]) {
-    /* Keep wrapper in hover state */
-  }
-
+  /* Keep menu button visible when menu is open */
   .image-wrapper:has(.image-context-menu[style*="block"]) .image-menu-button {
     display: flex;
     opacity: 1;
-  }
-
-  /* Keep hover state when menu is visible */
-  .image-wrapper.image-hover-active,
-  .image-wrapper:has(.image-context-menu[style*="block"]) {
-    /* Maintain active state */
   }
 
   /* ============================================

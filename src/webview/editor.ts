@@ -41,6 +41,27 @@ import { shouldAutoLink } from './utils/linkValidation';
 import { buildOutlineFromEditor } from './utils/outline';
 import { scrollToHeading } from './utils/scrollToHeading';
 import { collectExportContent, getDocumentTitle } from './utils/exportContent';
+
+// Helper function for slug generation (same as in linkDialog)
+function generateHeadingSlug(text: string, existingSlugs: Set<string>): string {
+  const slug = text
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  let finalSlug = slug;
+  let counter = 1;
+  while (existingSlugs.has(finalSlug)) {
+    finalSlug = `${slug}-${counter}`;
+    counter++;
+  }
+
+  existingSlugs.add(finalSlug);
+  return finalSlug;
+}
 import {
   handleImageResized,
   showResizeModalAfterDownload,
@@ -662,11 +683,118 @@ function initializeEditor(initialContent: string) {
     document.addEventListener('click', documentClickHandler);
     document.addEventListener('keydown', keydownHandler);
 
+    // Add link click handler for navigation
+    const handleLinkClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const link = target.closest('.markdown-link') as HTMLAnchorElement;
+      if (!link) return;
+
+      const href = link.getAttribute('href');
+      console.log('[MD4H Webview] Link clicked:', href);
+
+      if (!href) {
+        console.warn('[MD4H Webview] Link has no href attribute');
+        return;
+      }
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      // External URLs
+      if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('mailto:')) {
+        console.log('[MD4H Webview] Sending openExternalLink message');
+        const vscode = (window as any).vscode;
+        if (vscode && typeof vscode.postMessage === 'function') {
+          vscode.postMessage({
+            type: 'openExternalLink',
+            url: href,
+          });
+        } else {
+          console.warn('[MD4H Webview] vscode.postMessage not available');
+        }
+        return;
+      }
+
+      // Anchor links (heading links)
+      if (href.startsWith('#')) {
+        console.log('[MD4H Webview] Handling anchor link:', href);
+        const slug = href.slice(1);
+        if (editorInstance) {
+          // Find heading by slug
+          const outline = buildOutlineFromEditor(editorInstance);
+          const existingSlugs = new Set<string>();
+          const headingMap = new Map<string, number>();
+
+          outline.forEach(entry => {
+            const headingSlug = generateHeadingSlug(entry.text, existingSlugs);
+            headingMap.set(headingSlug, entry.pos);
+          });
+
+          const headingPos = headingMap.get(slug);
+          if (headingPos !== undefined) {
+            console.log('[MD4H Webview] Scrolling to heading at position:', headingPos);
+            scrollToHeading(editorInstance, headingPos);
+          } else {
+            console.warn('[MD4H Webview] Heading not found for slug:', slug);
+          }
+        }
+        return;
+      }
+
+      // Detect image files - handle separately
+      if (/\.(png|jpe?g|gif|svg|webp|bmp|ico|tiff?)$/i.test(href)) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        console.log('[MD4H Webview] Image link clicked, sending openImage message');
+        const vscode = (window as any).vscode;
+        if (vscode && typeof vscode.postMessage === 'function') {
+          vscode.postMessage({
+            type: 'openImage',
+            path: href,
+          });
+        } else {
+          console.warn('[MD4H Webview] vscode.postMessage not available');
+        }
+        return;
+      }
+
+      // Local file links (non-image)
+      console.log('[MD4H Webview] Sending openFileLink message');
+      const vscode = (window as any).vscode;
+      if (vscode && typeof vscode.postMessage === 'function') {
+        vscode.postMessage({
+          type: 'openFileLink',
+          path: href,
+        });
+      } else {
+        console.warn('[MD4H Webview] vscode.postMessage not available');
+      }
+    };
+
+    // Add click handler to editor DOM
+    editorInstance.view.dom.addEventListener('click', handleLinkClick);
+
+    // Also handle links added dynamically by listening to editor updates
+    const updateLinkHandlers = () => {
+      const links = editorInstance.view.dom.querySelectorAll('.markdown-link');
+      links.forEach(link => {
+        if (!(link as any)._linkHandlerAdded) {
+          (link as any)._linkHandlerAdded = true;
+          // Handler is on parent, so this is just for marking
+        }
+      });
+    };
+
+    editorInstance.on('update', updateLinkHandlers);
+    updateLinkHandlers(); // Initial call
+
     // Clean up listeners when editor is destroyed to prevent memory leaks
     editorInstance.on('destroy', () => {
       document.removeEventListener('contextmenu', contextMenuHandler);
       document.removeEventListener('click', documentClickHandler);
       document.removeEventListener('keydown', keydownHandler);
+      editorInstance.view.dom.removeEventListener('click', handleLinkClick);
       console.log('[MD4H] Editor destroyed, global listeners cleaned up');
     });
 
@@ -1078,6 +1206,14 @@ window.addEventListener('message', (event: MessageEvent) => {
         if (!editor) return;
         const pos = message.pos as number;
         scrollToHeading(editor, pos);
+        break;
+      }
+      case 'fileSearchResults': {
+        import('./features/linkDialog').then(({ handleFileSearchResults }) => {
+          const results = message.results as Array<{ filename: string; path: string }>;
+          const requestId = message.requestId as number;
+          handleFileSearchResults(results, requestId);
+        });
         break;
       }
       default:
