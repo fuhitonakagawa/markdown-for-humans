@@ -67,14 +67,7 @@ describe('Link autolink prevention', () => {
   });
 
   describe('autolink on input (typing simulation)', () => {
-    const nonLinkPatterns = [
-      'readme.MD',
-      'file.md',
-      'document.txt',
-      '.MD',
-      '.md',
-      'test.pdf',
-    ];
+    const nonLinkPatterns = ['readme.MD', 'file.md', 'document.txt', '.MD', '.md', 'test.pdf'];
 
     nonLinkPatterns.forEach(pattern => {
       it(`should NOT auto-link "${pattern}" when typed`, () => {
@@ -124,11 +117,7 @@ describe('Link autolink prevention', () => {
   });
 
   describe('real URLs SHOULD become links', () => {
-    const realUrls = [
-      'https://example.com',
-      'http://test.io',
-      'https://docs.example.com/file.md',
-    ];
+    const realUrls = ['https://example.com', 'http://test.io', 'https://docs.example.com/file.md'];
 
     realUrls.forEach(url => {
       it(`should auto-link real URL "${url}"`, () => {

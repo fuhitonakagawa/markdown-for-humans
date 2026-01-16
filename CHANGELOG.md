@@ -2,22 +2,66 @@
 
 All notable changes to Markdown for Humans will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [0.1.1] - 2026-01-07
+
+### Fixed
+
+- **MAJOR FIX:** Fixed auto-linking bug where file extensions (.md, .txt, .pdf, etc.) and filenames ending with document extensions were incorrectly converted to links when typing. Text ending with .md or similar extensions now remains as plain text instead of being auto-linked
+- Fixed lint regex and formatting issues in test files (image path resolution, image rename checks, image resize, and in-memory files tests)
+- Fixed Jest configuration to resolve failing tests in CI pipeline
+- Fixed pre-commit hook script for Windows system compatibility
+- **Image Link Navigation**: Fixed image files not opening when clicked - now properly opens in VS Code's image preview
+- **File Link Navigation**: Enhanced path resolution for both development and packaged builds
+- **Path Resolution**: Improved relative path handling with fallback to workspace root when document-relative path fails
+- **Link Click Handling**: Fixed preventDefault() and stopPropagation() to prevent browser from interfering with link navigation
+
+### Added
+
+- Added shouldAutoLink validation utility to prevent unwanted auto-linking of file extensions and bare filenames
+- Added comprehensive test suite for link autolink prevention (src/__tests__/webview/linkAutolink.test.ts)
+- Added pre-commit hook that automatically runs npm run lint:fix before each commit
+- Added enhanced test setup files (setup-after-env.ts) for improved test reliability
+- Added GitHub Actions workflow for automated package creation on push to main branch
+- **Enhanced Link Dialog** - Completely redesigned link creation experience with three modes:
+  - **URL Mode**: Create external links to websites
+  - **File Mode**: Link to local files with intelligent fuzzy search and autocomplete
+  - **Headings Mode**: Link to headings within the current document (H1-H6)
+- **File Search with Filters**: Search workspace files with category filters (Markdown, Images, Code, Config)
+- **Smart Path Display**: Shows only filename or heading text in the input field while storing the full path internally
+- **Dynamic Label**: Link input label changes based on selected mode (URL/File/Heading)
+- **Visual Differentiation**: Subtle colored borders in autocomplete results to distinguish files from headings
+
 ### Changed
-- Optimized marketplace discoverability: Updated displayName to "Markdown WYSIWYG Editor for Humans" to improve search ranking for "markdown editor" and "wysiwyg markdown" queries
-- Expanded keywords from 6 to 30 terms for better marketplace visibility
-- Updated description to SEO-optimized version highlighting key features
-- Restructured README with comparison table and improved SEO positioning
+
+- Enhanced marketplace discoverability: Updated displayName to "Markdown WYSIWYG Editor for Humans" to improve search ranking for "markdown editor" and "wysiwyg markdown" queries
+- Expanded keywords from 6 to 30 terms for better marketplace visibility (includes: notion-like, writing, documentation, formatting, syntax-highlighting, live-preview, full-screen, distraction-free, cover-images, image-resizing, export, html, pdf, docx, human-friendly, and more)
+- Updated package.json description to SEO-optimized version highlighting key features
+- Restructured README with comparison table ("What Makes It Different") and improved SEO positioning
+- Improved Jest test configuration with better coverage thresholds and setup files
+- Updated test files to use more robust patterns and improved error handling
+- **Link Dialog UX**: Radio buttons moved to appear right after Link Text input for better workflow
+- **Button Alignment**: Cancel and OK buttons aligned to the right side of the dialog
+- **Autocomplete UI**: Removed emojis, replaced with clean borders for a more professional appearance
+- **Dropdown Sizing**: Autocomplete dropdown now dynamically adjusts height to prevent overflow in different modes
+
+### Developer Experience
+
+- Enabled pre-commit hook (previously disabled) - automatically fixes linting issues before commits
+- Fixed GitHub Actions CI/CD pipeline - now properly creates VSIX packages on push to main branch
+- Improved test reliability and CI stability with enhanced Jest configuration
 
 ---
 
 ## [0.1.0] - Initial Release
 
 ### Added
+
 - WYSIWYG markdown editing with TipTap
 - Headers (H1-H6)
 - Inline formatting (bold, italic, strikethrough, code)
@@ -50,11 +94,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Toolbar icon refresh with Codicon-based icons
 
 ### Changed
+
 - Enhanced undo reliability and dirty state handling
 - Improved frontmatter rendering (no false dirty indicators)
 - Better image handling with workspace path resolution
 
 ### Fixed
+
 - Fixed image drag-drop bugs preventing VS Code from opening files
 - Fixed frontmatter dirty state on document open
 - Fixed undo stack synchronization with VS Code
@@ -62,5 +108,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/concretios/markdown-for-humans/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/concretios/markdown-for-humans/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/concretios/markdown-for-humans/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/concretios/markdown-for-humans/releases/tag/v0.1.0
