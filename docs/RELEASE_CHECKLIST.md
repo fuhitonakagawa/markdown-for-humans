@@ -9,8 +9,10 @@ Quick checklist for publishing Markdown for Humans to VS Code Marketplace.
 ### Standard Release (Recommended)
 
 ```bash
-# 1. Update changelog
-# Edit CHANGELOG.md with new version details
+# 1. Update CHANGELOG.md ONLY (single source of truth)
+# Add new version section with human-readable changes
+# Format: What's New, Fixed, Changed, Technical Improvements
+# ⚠️  NEVER create separate RELEASE_NOTES_*.md files
 
 # 2. Run full test suite
 npm run lint:fix && npm test && npm run build:release
@@ -39,7 +41,8 @@ git push origin --tags
 
 # 8. Create GitHub release
 # Go to: https://github.com/concretios/markdown-for-humans/releases/new
-# Select the tag, add release notes, publish
+# Select the tag, copy/polish content from CHANGELOG.md, publish
+# Tip: Make it user-friendly with emojis and "What's New" sections
 ```
 
 ### Version Bump Types
@@ -60,7 +63,10 @@ git push origin --tags
 - [ ] Build succeeds: `npm run build:release`
 
 ### Version & Changelog
-- [ ] Update `CHANGELOG.md` with new version section
+- [ ] **Update `CHANGELOG.md` with new version section** (this is your ONLY changelog file)
+- [ ] Write human-readable release notes (What's New, Fixed, Changed sections)
+- [ ] Use CHANGELOG.md content for GitHub releases (copy/polish as needed)
+- [ ] ⚠️ **Never create separate RELEASE_NOTES_*.md files** - they become stale
 - [ ] Commit all changes (version will be auto-bumped during publish)
 
 ### Package & Test
