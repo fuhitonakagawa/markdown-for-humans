@@ -8,6 +8,8 @@
 
 ## 🚀 See It In Action
 
+> We also support standard shortcuts like `CTRL/CMD + B`, etc
+
 ![Markdown for Humans Overview](https://raw.githubusercontent.com/bhavya-concretio/markdown-for-humans/4bf7defb6a3e7ee56b34e6dd9dc0a55e471740ec/marketplace-assets/gifs/basic_overview_of_features.gif)
 
 *Experience seamless WYSIWYG markdown editing with visual table editing, image management, and more—all in VS Code.*
@@ -43,14 +45,16 @@ As natural as it gets in Microsoft Word or Google Docs etc.
 
 ## Image Management That Actually Works
 
+> Press shift while dragging images, in case your face issues on drag drop in editor
+
 ![Large Size Image Suggestion](https://raw.githubusercontent.com/concretios/markdown-for-humans/integration/marketplace-assets/gifs/large_size_image_size_suggestion.gif)
 
 **Drag images in. Resize with handles. Rename inline. No manual file operations.**
 
 - ✅ **Drag & drop** — Drop images directly into your document
 - ✅ **In-place resizing** — Drag handles to adjust width, see live preview
-- ✅ **Auto-size suggestions** — Get warnings for oversized images
-- ✅ **Rename images** — Change filenames without leaving the editor
+- ✅ **Auto-size suggestions** — Get warnings for oversized images (saves your storage on GIT)
+- ✅ **Rename images** — Change filenames without leaving the editor (we rename file on disk, and also update the markdown code)
 - ✅ **Metadata overlay** — View dimensions, file size, and path at a glance
 
 > [!IMPORTANT]
@@ -65,6 +69,7 @@ As natural as it gets in Microsoft Word or Google Docs etc.
 ---
 
 ## Built on True WYSIWYG Editing
+Humans work that way.
 
 ![WYSIWYG Editing](https://raw.githubusercontent.com/concretios/markdown-for-humans/integration/marketplace-assets/gifs/basic_introduction.gif)
 
