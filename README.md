@@ -10,7 +10,7 @@
 
 > We also support standard shortcuts like `CTRL/CMD + B`, etc
 
-![Markdown for Humans Overview](https://raw.githubusercontent.com/bhavya-concretio/markdown-for-humans/4bf7defb6a3e7ee56b34e6dd9dc0a55e471740ec/marketplace-assets/gifs/basic_overview_of_features.gif)
+![Markdown for Humans Overview](https://raw.githubusercontent.com/concretios/markdown-for-humans/4bf7defb6a3e7ee56b34e6dd9dc0a55e471740ec/marketplace-assets/gifs/basic_overview_of_features.gif)
 
 *Experience seamless WYSIWYG markdown editing with visual table editing, image management, and more—all in VS Code.*
 
@@ -148,7 +148,7 @@ Built on TipTap with a **human-first design philosophy**:
 
 ### Enhanced Link Dialog
 
-![Enhanced Link Feature](https://raw.githubusercontent.com/bhavya-concretio/markdown-for-humans/4bf7defb6a3e7ee56b34e6dd9dc0a55e471740ec/marketplace-assets/gifs/hyperlink_feature.gif)
+![Enhanced Link Feature](https://raw.githubusercontent.com/concretios/markdown-for-humans/4bf7defb6a3e7ee56b34e6dd9dc0a55e471740ec/marketplace-assets/gifs/hyperlink_feature.gif)
 
 *Create links easily with support for URLs, file linking, heading links, and more—all through an intuitive dialog interface.*
 
@@ -160,7 +160,7 @@ Built on TipTap with a **human-first design philosophy**:
 
 ### Document Outline
 
-![Document Outline](https://raw.githubusercontent.com/bhavya-concretio/markdown-for-humans/4bf7defb6a3e7ee56b34e6dd9dc0a55e471740ec/marketplace-assets/gifs/outline_feature_with_sidebar_display.gif)
+![Document Outline](https://raw.githubusercontent.com/concretios/markdown-for-humans/4bf7defb6a3e7ee56b34e6dd9dc0a55e471740ec/marketplace-assets/gifs/outline_feature_with_sidebar_display.gif)
 
 *Navigate your document quickly with sidebar outline showing all headings for instant access.*
 
