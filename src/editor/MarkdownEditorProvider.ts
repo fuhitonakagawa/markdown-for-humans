@@ -545,6 +545,18 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       case 'revealImageInExplorer':
         this.handleRevealImageInExplorer(message, document);
         break;
+      case 'searchFiles':
+        void this.handleSearchFiles(message, webview);
+        break;
+      case 'openExternalLink':
+        void this.handleOpenExternalLink(message);
+        break;
+      case 'openFileLink':
+        void this.handleOpenFileLink(message, document);
+        break;
+      case 'openImage':
+        void this.handleOpenImage(message, document);
+        break;
     }
   }
 
@@ -1803,6 +1815,462 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`[MD4H] Failed to reveal image in Explorer: ${errorMessage}`);
       vscode.window.showErrorMessage(`Failed to reveal image: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * File extension categories for filtering
+   */
+  private readonly FILE_CATEGORIES = {
+    md: ['.md', '.markdown'],
+    images: ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp', '.ico'],
+    code: [
+      '.js',
+      '.ts',
+      '.jsx',
+      '.tsx',
+      '.py',
+      '.java',
+      '.cpp',
+      '.c',
+      '.h',
+      '.go',
+      '.rs',
+      '.rb',
+      '.php',
+      '.swift',
+      '.kt',
+      '.cs',
+      '.sh',
+      '.bash',
+      '.zsh',
+      '.fish',
+    ],
+    config: ['.json', '.xml', '.yaml', '.yml', '.toml', '.ini', '.conf', '.config', '.properties'],
+  };
+
+  /**
+   * Handle file search request from webview
+   */
+  private async handleSearchFiles(
+    message: { type: string; [key: string]: unknown },
+    webview: vscode.Webview
+  ): Promise<void> {
+    try {
+      const query = (message.query as string) || '';
+      const filters = (message.filters as {
+        all?: boolean;
+        md?: boolean;
+        images?: boolean;
+        code?: boolean;
+        config?: boolean;
+      }) || { all: true };
+      const requestId = (message.requestId as number) || 0;
+
+      console.log('[MD4H] File search request:', { query, filters, requestId });
+
+      if (!query || query.trim().length < 1) {
+        console.log('[MD4H] Empty query, returning empty results');
+        webview.postMessage({
+          type: 'fileSearchResults',
+          results: [],
+          requestId,
+        });
+        return;
+      }
+
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (!workspaceFolders || workspaceFolders.length === 0) {
+        console.warn('[MD4H] No workspace folders found');
+        webview.postMessage({
+          type: 'fileSearchResults',
+          results: [],
+          requestId,
+        });
+        return;
+      }
+
+      // More permissive exclude pattern - only exclude truly unnecessary directories
+      const excludePattern =
+        '{**/node_modules/**,**/.git/**,**/.vscode/**,**/dist/**,**/build/**,**/.next/**,**/coverage/**}';
+      console.log('[MD4H] Searching files with pattern:', excludePattern);
+
+      // Increase max results to ensure we have enough files to search through
+      const allFiles = await vscode.workspace.findFiles('**/*', excludePattern, 10000);
+      console.log('[MD4H] Found', allFiles.length, 'files total');
+
+      let filteredFiles = allFiles;
+      if (!filters.all) {
+        const allowedExtensions = new Set<string>();
+        if (filters.md) {
+          this.FILE_CATEGORIES.md.forEach(ext => allowedExtensions.add(ext));
+        }
+        if (filters.images) {
+          this.FILE_CATEGORIES.images.forEach(ext => allowedExtensions.add(ext));
+        }
+        if (filters.code) {
+          this.FILE_CATEGORIES.code.forEach(ext => allowedExtensions.add(ext));
+        }
+        if (filters.config) {
+          this.FILE_CATEGORIES.config.forEach(ext => allowedExtensions.add(ext));
+        }
+
+        filteredFiles = allFiles.filter(uri => {
+          const ext = path.extname(uri.fsPath).toLowerCase();
+          return allowedExtensions.has(ext);
+        });
+        console.log('[MD4H] After filter:', filteredFiles.length, 'files');
+      }
+
+      const queryLower = query.toLowerCase().trim();
+      const queryParts = queryLower.split(/\s+/).filter(p => p.length > 0);
+
+      // Enhanced matching: search by filename, path, and individual query parts
+      const matchingFiles = filteredFiles.filter(uri => {
+        const filename = path.basename(uri.fsPath);
+        const filenameLower = filename.toLowerCase();
+        const relativePath = this.getRelativePath(uri, workspaceFolders[0].uri);
+        const pathLower = relativePath.toLowerCase();
+
+        // Primary match: filename contains query
+        if (filenameLower.includes(queryLower)) {
+          return true;
+        }
+
+        // Secondary match: path contains query
+        if (pathLower.includes(queryLower)) {
+          return true;
+        }
+
+        // Tertiary match: all query parts appear in filename or path
+        if (queryParts.length > 1) {
+          const allPartsMatch = queryParts.every(
+            part => filenameLower.includes(part) || pathLower.includes(part)
+          );
+          if (allPartsMatch) {
+            return true;
+          }
+        }
+
+        // Match filename without extension
+        const filenameWithoutExt = path.parse(filename).name.toLowerCase();
+        if (filenameWithoutExt.includes(queryLower)) {
+          return true;
+        }
+
+        return false;
+      });
+
+      console.log('[MD4H] Found', matchingFiles.length, 'matching files');
+
+      // Sort results: exact filename matches first, then path matches, then partial matches
+      const sortedFiles = matchingFiles.sort((a, b) => {
+        const aFilename = path.basename(a.fsPath).toLowerCase();
+        const bFilename = path.basename(b.fsPath).toLowerCase();
+        const aPath = this.getRelativePath(a, workspaceFolders[0].uri).toLowerCase();
+        const bPath = this.getRelativePath(b, workspaceFolders[0].uri).toLowerCase();
+
+        // Exact filename match gets highest priority
+        const aExactMatch = aFilename === queryLower;
+        const bExactMatch = bFilename === queryLower;
+        if (aExactMatch && !bExactMatch) return -1;
+        if (!aExactMatch && bExactMatch) return 1;
+
+        // Filename starts with query gets second priority
+        const aStartsWith = aFilename.startsWith(queryLower);
+        const bStartsWith = bFilename.startsWith(queryLower);
+        if (aStartsWith && !bStartsWith) return -1;
+        if (!aStartsWith && bStartsWith) return 1;
+
+        // Filename contains query gets third priority
+        const aFilenameContains = aFilename.includes(queryLower);
+        const bFilenameContains = bFilename.includes(queryLower);
+        if (aFilenameContains && !bFilenameContains) return -1;
+        if (!aFilenameContains && bFilenameContains) return 1;
+
+        // Path contains query gets fourth priority
+        const aPathContains = aPath.includes(queryLower);
+        const bPathContains = bPath.includes(queryLower);
+        if (aPathContains && !bPathContains) return -1;
+        if (!aPathContains && bPathContains) return 1;
+
+        // Alphabetical by filename
+        return aFilename.localeCompare(bFilename);
+      });
+
+      const results = sortedFiles.slice(0, 20).map(uri => {
+        const filename = path.basename(uri.fsPath);
+        const relativePath = this.getRelativePath(uri, workspaceFolders[0].uri);
+        return {
+          filename,
+          path: relativePath,
+        };
+      });
+
+      console.log('[MD4H] Sending', results.length, 'results to webview');
+      webview.postMessage({
+        type: 'fileSearchResults',
+        results,
+        requestId,
+      });
+    } catch (error) {
+      console.error('[MD4H] Error searching files:', error);
+      const requestId = (message.requestId as number) || 0;
+      webview.postMessage({
+        type: 'fileSearchResults',
+        results: [],
+        requestId,
+        error: 'Failed to search files',
+      });
+    }
+  }
+
+  /**
+   * Get relative path from workspace root
+   */
+  private getRelativePath(fileUri: vscode.Uri, workspaceUri: vscode.Uri): string {
+    const filePath = fileUri.fsPath;
+    const workspacePath = workspaceUri.fsPath;
+
+    if (filePath.startsWith(workspacePath)) {
+      let relative = path.relative(workspacePath, filePath);
+      relative = relative.replace(/\\/g, '/');
+      return relative;
+    }
+
+    return path.basename(filePath);
+  }
+
+  /**
+   * Handle external link navigation (open in browser)
+   */
+  private async handleOpenExternalLink(message: {
+    type: string;
+    [key: string]: unknown;
+  }): Promise<void> {
+    try {
+      const url = (message.url as string) || '';
+      console.log('[MD4H] handleOpenExternalLink called with URL:', url);
+
+      if (!url) {
+        console.warn('[MD4H] No URL provided for external link');
+        return;
+      }
+
+      // Validate URL format
+      if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('mailto:')) {
+        console.warn('[MD4H] Invalid external URL format:', url);
+        return;
+      }
+
+      console.log('[MD4H] Opening external link:', url);
+      await vscode.env.openExternal(vscode.Uri.parse(url));
+      console.log('[MD4H] Successfully opened external link');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('[MD4H] Failed to open external link:', errorMessage, error);
+      vscode.window.showErrorMessage(`Failed to open link: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Handle image link navigation (open image in VS Code preview)
+   */
+  private async handleOpenImage(
+    message: { type: string; [key: string]: unknown },
+    document: vscode.TextDocument
+  ): Promise<void> {
+    const imagePath = String(message.path || '');
+    if (!imagePath) {
+      console.warn('[MD4H] No image path provided');
+      return;
+    }
+
+    console.log('[MD4H] handleOpenImage called with path:', imagePath);
+
+    // Normalize path: remove ./ prefix if present for path resolution
+    const normalizedPath = imagePath.startsWith('./') ? imagePath.slice(2) : imagePath;
+
+    // Try document-relative first
+    let baseDir: string | undefined;
+    if (document.uri.scheme === 'file') {
+      baseDir = path.dirname(document.uri.fsPath);
+    } else {
+      baseDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    }
+
+    if (!baseDir) {
+      console.error('[MD4H] Cannot resolve image path: no base directory');
+      vscode.window.showWarningMessage('Cannot resolve image path');
+      return;
+    }
+
+    let imageFullPath = path.resolve(baseDir, normalizedPath);
+    let imageUri = vscode.Uri.file(imageFullPath);
+    console.log('[MD4H] Trying document-relative path:', imageFullPath);
+
+    // Check if file exists at document-relative path
+    let fileExists = false;
+    try {
+      await vscode.workspace.fs.stat(imageUri);
+      fileExists = true;
+      console.log('[MD4H] Image found at document-relative path');
+    } catch {
+      console.log('[MD4H] Image not found at document-relative path, trying workspace root');
+
+      // Fallback: try workspace root
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+      if (workspaceFolder) {
+        const workspacePath = workspaceFolder.uri.fsPath;
+        imageFullPath = path.resolve(workspacePath, normalizedPath);
+        imageUri = vscode.Uri.file(imageFullPath);
+        console.log('[MD4H] Trying workspace-relative path:', imageFullPath);
+
+        try {
+          await vscode.workspace.fs.stat(imageUri);
+          fileExists = true;
+          console.log('[MD4H] Image found at workspace-relative path');
+        } catch {
+          console.log('[MD4H] Image not found at workspace-relative path either');
+        }
+      }
+    }
+
+    if (!fileExists) {
+      const errorMsg = `Image not found: ${imagePath}`;
+      console.error('[MD4H]', errorMsg);
+      vscode.window.showErrorMessage(errorMsg);
+      return;
+    }
+
+    try {
+      console.log('[MD4H] Opening image:', imageUri.fsPath);
+      await vscode.commands.executeCommand('vscode.open', imageUri);
+      console.log('[MD4H] Successfully opened image');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error('[MD4H] Failed to open image:', errorMessage, err);
+      vscode.window.showErrorMessage(`Failed to open image: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Handle file link navigation (open file in VS Code)
+   */
+  private async handleOpenFileLink(
+    message: { type: string; [key: string]: unknown },
+    document: vscode.TextDocument
+  ): Promise<void> {
+    try {
+      const filePath = (message.path as string) || '';
+      console.log('[MD4H] handleOpenFileLink called with path:', filePath);
+
+      if (!filePath) {
+        console.warn('[MD4H] No path provided for file link');
+        return;
+      }
+
+      // Resolve relative path from current document
+      const basePath = path.dirname(document.uri.fsPath);
+
+      // Normalize path: remove ./ prefix if present for path resolution
+      const normalizedFilePath = filePath.startsWith('./') ? filePath.slice(2) : filePath;
+      const absolutePath = path.resolve(basePath, normalizedFilePath);
+      let fileUri = vscode.Uri.file(absolutePath);
+      console.log('[MD4H] Resolved file URI (document-relative):', fileUri.fsPath);
+
+      // Check if file exists
+      let fileExists = false;
+      try {
+        await vscode.workspace.fs.stat(fileUri);
+        fileExists = true;
+        console.log('[MD4H] File exists (document-relative):', fileUri.fsPath);
+      } catch {
+        // File doesn't exist, try to find it in workspace
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (workspaceFolders && workspaceFolders.length > 0) {
+          // Try relative to workspace root
+          const workspacePath = workspaceFolders[0].uri.fsPath;
+          // Use normalized path (already normalized above)
+          const workspaceFileUri = vscode.Uri.file(path.resolve(workspacePath, normalizedFilePath));
+          console.log('[MD4H] Trying workspace-relative path:', workspaceFileUri.fsPath);
+          try {
+            await vscode.workspace.fs.stat(workspaceFileUri);
+            fileUri = workspaceFileUri;
+            fileExists = true;
+            console.log('[MD4H] File exists (workspace-relative):', fileUri.fsPath);
+          } catch {
+            // Not found in workspace either
+            console.log('[MD4H] File not found in workspace-relative path');
+          }
+        }
+      }
+
+      if (!fileExists) {
+        // File not found, show error
+        vscode.window.showWarningMessage(`File not found: ${filePath}`);
+        console.warn('[MD4H] File not found:', filePath);
+        return;
+      }
+
+      // Check if file is an image
+      const imageExtensions = [
+        '.png',
+        '.jpg',
+        '.jpeg',
+        '.gif',
+        '.svg',
+        '.webp',
+        '.bmp',
+        '.ico',
+        '.tiff',
+        '.tif',
+      ];
+      const fileExtension = path.extname(fileUri.fsPath).toLowerCase();
+      const isImage = imageExtensions.includes(fileExtension);
+      console.log('[MD4H] File extension:', fileExtension, '| Is image:', isImage);
+
+      if (isImage) {
+        // For image files, use vscode.open command directly
+        // This automatically opens images in VS Code's image preview
+        console.log('[MD4H] Attempting to open image file with vscode.open command');
+        try {
+          await vscode.commands.executeCommand('vscode.open', fileUri);
+          console.log('[MD4H] Successfully opened image file:', fileUri.fsPath);
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.error('[MD4H] Failed to open image file:', errorMessage, error);
+          vscode.window.showErrorMessage(`Failed to open image file: ${errorMessage}`);
+        }
+      } else {
+        // For text files, use openTextDocument
+        console.log('[MD4H] Attempting to open text file with openTextDocument');
+        try {
+          const doc = await vscode.workspace.openTextDocument(fileUri);
+          await vscode.window.showTextDocument(doc);
+          console.log('[MD4H] Successfully opened file link:', fileUri.fsPath);
+        } catch (error) {
+          // If it's not a text file, try vscode.open command as fallback
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.log('[MD4H] openTextDocument failed, error:', errorMessage);
+          if (errorMessage.includes('Binary') || errorMessage.includes('binary')) {
+            console.log('[MD4H] File is binary, trying vscode.open command as fallback');
+            try {
+              await vscode.commands.executeCommand('vscode.open', fileUri);
+              console.log('[MD4H] Opened binary file using vscode.open command');
+            } catch (fallbackError) {
+              console.error('[MD4H] Failed to open file:', fallbackError);
+              vscode.window.showErrorMessage(`Failed to open file: ${errorMessage}`);
+            }
+          } else {
+            throw error;
+          }
+        }
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('[MD4H] Failed to open file link:', errorMessage, error);
+      vscode.window.showErrorMessage(`Failed to open file: ${errorMessage}`);
     }
   }
 

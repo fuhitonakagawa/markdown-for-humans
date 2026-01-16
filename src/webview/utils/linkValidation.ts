@@ -25,8 +25,7 @@ export function shouldAutoLink(url: string): boolean {
 
   if (!hasProtocol && !hasPath) {
     // Reject common document extensions being auto-linked
-    const docExtensions =
-      /\.(md|txt|pdf|doc|docx|xls|xlsx|ppt|pptx|csv|json|xml|yaml|yml)$/i;
+    const docExtensions = /\.(md|txt|pdf|doc|docx|xls|xlsx|ppt|pptx|csv|json|xml|yaml|yml)$/i;
     if (docExtensions.test(url)) {
       return false;
     }
