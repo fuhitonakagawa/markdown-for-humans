@@ -1,4 +1,4 @@
-# Markdown WYSIWYG Editor for Humans
+# Markdown for Humans: WYSIWYG Editor
 
 **Seamless WYSIWYG markdown editing for VS Code** — Write markdown the way humans think.
 

@@ -68,7 +68,7 @@ This release includes several under-the-hood improvements that make the extensio
 
 ### Changed
 
-- Enhanced marketplace discoverability: Updated displayName to "Markdown WYSIWYG Editor for Humans" to improve search ranking for "markdown editor" and "wysiwyg markdown" queries
+- Enhanced marketplace discoverability: Updated displayName to "Markdown for Humans: WYSIWYG Editor" to improve brand clarity while maintaining search ranking for "markdown editor" and "wysiwyg markdown" queries
 - Expanded keywords from 6 to 30 terms for better marketplace visibility (includes: notion-like, writing, documentation, formatting, syntax-highlighting, live-preview, full-screen, distraction-free, cover-images, image-resizing, export, html, pdf, docx, human-friendly, and more)
 - Updated package.json description to SEO-optimized version highlighting key features
 - Restructured README with comparison table ("What Makes It Different") and improved SEO positioning
