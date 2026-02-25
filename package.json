@@ -94,6 +94,18 @@
         "title": "Open with Markdown for Humans"
       },
       {
+        "command": "markdownForHumans.editorZoomIn",
+        "title": "Editor Zoom In"
+      },
+      {
+        "command": "markdownForHumans.editorZoomOut",
+        "title": "Editor Zoom Out"
+      },
+      {
+        "command": "markdownForHumans.editorZoomReset",
+        "title": "Editor Zoom Reset"
+      },
+      {
         "command": "markdownForHumans.outline.revealCurrent",
         "title": "Outline: Reveal Current Heading",
         "icon": "$(target)"
@@ -144,6 +156,26 @@
         }
       ]
     },
+    "keybindings": [
+      {
+        "command": "markdownForHumans.editorZoomIn",
+        "key": "ctrl+=",
+        "mac": "cmd+=",
+        "when": "activeCustomEditorId == markdownForHumans.editor"
+      },
+      {
+        "command": "markdownForHumans.editorZoomOut",
+        "key": "ctrl+-",
+        "mac": "cmd+-",
+        "when": "activeCustomEditorId == markdownForHumans.editor"
+      },
+      {
+        "command": "markdownForHumans.editorZoomReset",
+        "key": "ctrl+0",
+        "mac": "cmd+0",
+        "when": "activeCustomEditorId == markdownForHumans.editor"
+      }
+    ],
     "configuration": {
       "title": "Markdown for Humans",
       "properties": {
@@ -164,7 +196,7 @@
         "markdownForHumans.attachmentPath": {
           "type": "string",
           "default": "attachments",
-          "description": "Folder path for saved attachments (PDF). Interpreted relative to markdownForHumans.attachmentPathBase."
+          "description": "Folder path for saved attachments. Interpreted relative to markdownForHumans.attachmentPathBase."
         },
         "markdownForHumans.attachmentPathBase": {
           "type": "string",
@@ -174,6 +206,13 @@
           ],
           "default": "relativeToDocument",
           "description": "Controls whether Attachment Path is relative to the current markdown file folder or the workspace folder."
+        },
+        "markdownForHumans.editorZoomLevel": {
+          "type": "number",
+          "default": 0,
+          "minimum": -5,
+          "maximum": 10,
+          "description": "Zoom level for the WYSIWYG editor only. 0 = 100%, 1 = 110%, -1 = 90%."
         },
         "markdownForHumans.chromePath": {
           "type": "string",

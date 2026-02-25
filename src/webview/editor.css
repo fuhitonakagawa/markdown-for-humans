@@ -27,7 +27,8 @@
   --md-selection: var(--vscode-editor-selectionBackground);
 
   /* Typography and layout */
-  --md-base-size: var(--vscode-editor-font-size, 14px);
+  --mfh-editor-font-scale: 1;
+  --md-base-size: calc(var(--vscode-editor-font-size, 14px) * var(--mfh-editor-font-scale));
 
   line-height: 1.58;
   letter-spacing: -0.003em;
@@ -201,7 +202,7 @@
   background: none;
   padding: 0;
   color: inherit;
-  font-size: calc(var(--vscode-editor-font-size) * 0.95);
+  font-size: calc(var(--md-base-size) * 0.95);
 }
 
 /* Syntax highlighting - Code blocks */

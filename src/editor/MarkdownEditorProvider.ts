@@ -136,6 +136,10 @@ export function updateFilenameDimensions(
  */
 export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
   private static readonly PENDING_EDIT_WINDOW_MS = 100;
+  private static readonly DEFAULT_EDITOR_ZOOM_LEVEL = 0;
+  private static readonly MIN_EDITOR_ZOOM_LEVEL = -5;
+  private static readonly MAX_EDITOR_ZOOM_LEVEL = 10;
+  private static readonly EDITOR_ZOOM_STEP = 0.1;
 
   // Track pending edits to avoid feedback loops
   // Key: document URI, Value: pending edit metadata (timestamp + source webview key)
@@ -149,6 +153,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
   private webviewKeyCounter = 0;
   // Remember last content sent to each webview (not per document)
   private lastWebviewContentByView = new Map<string, string>();
+  private editorZoomLevel = MarkdownEditorProvider.DEFAULT_EDITOR_ZOOM_LEVEL;
 
   public static register(context: vscode.ExtensionContext): vscode.Disposable {
     const provider = new MarkdownEditorProvider(context);
@@ -163,10 +168,35 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
         supportsMultipleEditorsPerDocument: true,
       }
     );
-    return providerRegistration;
+
+    const zoomInCommand = vscode.commands.registerCommand('markdownForHumans.editorZoomIn', () => {
+      void provider.adjustEditorZoom(1);
+    });
+
+    const zoomOutCommand = vscode.commands.registerCommand('markdownForHumans.editorZoomOut', () => {
+      void provider.adjustEditorZoom(-1);
+    });
+
+    const zoomResetCommand = vscode.commands.registerCommand(
+      'markdownForHumans.editorZoomReset',
+      () => {
+        void provider.resetEditorZoom();
+      }
+    );
+
+    return {
+      dispose: () => {
+        providerRegistration.dispose();
+        zoomInCommand.dispose();
+        zoomOutCommand.dispose();
+        zoomResetCommand.dispose();
+      },
+    };
   }
 
-  constructor(private readonly context: vscode.ExtensionContext) {}
+  constructor(private readonly context: vscode.ExtensionContext) {
+    this.editorZoomLevel = this.getConfiguredEditorZoomLevel();
+  }
 
   private getWebviewKey(webview: vscode.Webview): string {
     const existingKey = this.webviewKeys.get(webview);
@@ -241,6 +271,73 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
     for (const webview of webviews) {
       this.updateWebview(document, webview);
     }
+  }
+
+  private normalizeEditorZoomLevel(level: number): number {
+    const safeLevel = Number.isFinite(level)
+      ? Math.round(level)
+      : MarkdownEditorProvider.DEFAULT_EDITOR_ZOOM_LEVEL;
+    return Math.max(
+      MarkdownEditorProvider.MIN_EDITOR_ZOOM_LEVEL,
+      Math.min(MarkdownEditorProvider.MAX_EDITOR_ZOOM_LEVEL, safeLevel)
+    );
+  }
+
+  private getConfiguredEditorZoomLevel(): number {
+    const config = vscode.workspace.getConfiguration('markdownForHumans');
+    const configuredLevel = config.get<number>(
+      'editorZoomLevel',
+      MarkdownEditorProvider.DEFAULT_EDITOR_ZOOM_LEVEL
+    );
+    return this.normalizeEditorZoomLevel(configuredLevel);
+  }
+
+  private getEditorZoomScale(level: number): number {
+    const scale = 1 + level * MarkdownEditorProvider.EDITOR_ZOOM_STEP;
+    return Number(scale.toFixed(2));
+  }
+
+  private postEditorZoomToWebview(webview: vscode.Webview): void {
+    webview.postMessage({
+      type: 'setEditorZoom',
+      zoomLevel: this.editorZoomLevel,
+      zoomScale: this.getEditorZoomScale(this.editorZoomLevel),
+    });
+  }
+
+  private broadcastEditorZoom(): void {
+    for (const webviews of this.webviewsByDocument.values()) {
+      for (const webview of webviews) {
+        this.postEditorZoomToWebview(webview);
+      }
+    }
+  }
+
+  private async persistEditorZoomLevel(level: number): Promise<void> {
+    const config = vscode.workspace.getConfiguration('markdownForHumans');
+    await config.update('editorZoomLevel', level, vscode.ConfigurationTarget.Global);
+  }
+
+  private async setEditorZoomLevel(level: number): Promise<void> {
+    const normalizedLevel = this.normalizeEditorZoomLevel(level);
+    this.editorZoomLevel = normalizedLevel;
+
+    try {
+      await this.persistEditorZoomLevel(normalizedLevel);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.warn('[MD4H] Failed to persist editor zoom level:', errorMessage);
+    }
+
+    this.broadcastEditorZoom();
+  }
+
+  private async adjustEditorZoom(delta: number): Promise<void> {
+    await this.setEditorZoomLevel(this.editorZoomLevel + delta);
+  }
+
+  private async resetEditorZoom(): Promise<void> {
+    await this.setEditorZoomLevel(MarkdownEditorProvider.DEFAULT_EDITOR_ZOOM_LEVEL);
   }
 
   /**
@@ -514,6 +611,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
 
     // Send initial content to webview
     this.updateWebview(document, webviewPanel.webview);
+    this.postEditorZoomToWebview(webviewPanel.webview);
 
     // Listen for configuration changes and update webview
     const configChangeSubscription = vscode.workspace.onDidChangeConfiguration(e => {
@@ -535,6 +633,11 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
           imagePath: imagePath,
           imagePathBase: imagePathBase,
         });
+      }
+
+      if (e.affectsConfiguration('markdownForHumans.editorZoomLevel')) {
+        this.editorZoomLevel = this.getConfiguredEditorZoomLevel();
+        this.postEditorZoomToWebview(webviewPanel.webview);
       }
     });
 
@@ -646,6 +749,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
           imagePath: imagePath,
           imagePathBase: imagePathBase,
         });
+        this.postEditorZoomToWebview(webview);
         break;
       }
       case 'outlineUpdated': {

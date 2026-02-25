@@ -150,6 +150,29 @@ let pendingInitialContent: string | null = null; // Content from host before edi
 let hasSentReadySignal = false;
 let isDomReady = document.readyState !== 'loading';
 let outlineUpdateTimeout: number | null = null;
+let pendingEditorZoomScale = 1;
+
+const MIN_EDITOR_ZOOM_SCALE = 0.5;
+const MAX_EDITOR_ZOOM_SCALE = 2;
+
+function clampEditorZoomScale(scale: number): number {
+  if (!Number.isFinite(scale)) {
+    return 1;
+  }
+  return Math.max(MIN_EDITOR_ZOOM_SCALE, Math.min(MAX_EDITOR_ZOOM_SCALE, scale));
+}
+
+function applyEditorZoomScale(scale: number): void {
+  const normalizedScale = clampEditorZoomScale(scale);
+  pendingEditorZoomScale = normalizedScale;
+
+  const editorRoot = document.querySelector('.markdown-editor') as HTMLElement | null;
+  if (!editorRoot) {
+    return;
+  }
+
+  editorRoot.style.setProperty('--mfh-editor-font-scale', normalizedScale.toString());
+}
 
 // Hash-based sync deduplication (replaces unreliable ignoreNextUpdate boolean)
 let lastSentContentHash: string | null = null;
@@ -540,6 +563,7 @@ function initializeEditor(initialContent: string) {
     });
 
     editor = editorInstance;
+    applyEditorZoomScale(pendingEditorZoomScale);
 
     // Set initial content as markdown (Tiptap v3 requires explicit contentType)
     if (initialContent) {
@@ -873,6 +897,11 @@ window.addEventListener('message', (event: MessageEvent) => {
         }
         if (typeof message.imagePathBase === 'string') {
           (window as any).imagePathBase = message.imagePathBase;
+        }
+        break;
+      case 'setEditorZoom':
+        if (typeof message.zoomScale === 'number') {
+          applyEditorZoomScale(message.zoomScale);
         }
         break;
       case 'imageResized': {
