@@ -24,7 +24,7 @@ interface ImageDropOptions {
  */
 export async function confirmImageDrop(
   fileCount: number,
-  defaultFolder: string = 'images'
+  defaultFolder: string = 'Files'
 ): Promise<ImageDropOptions | null> {
   const imagePathBase = (window as any).imagePathBase as string | undefined;
   const pathBaseLabel =
@@ -187,9 +187,9 @@ export function setRememberedFolder(folder: string | null): void {
 
 /**
  * Get the default image path from VS Code settings
- * Falls back to 'images' if setting is not available
+ * Falls back to 'Files' if setting is not available
  */
 export function getDefaultImagePath(): string {
   const imagePath = (window as any).imagePath;
-  return imagePath !== undefined && imagePath !== null ? imagePath : 'images';
+  return imagePath !== undefined && imagePath !== null ? imagePath : 'Files';
 }

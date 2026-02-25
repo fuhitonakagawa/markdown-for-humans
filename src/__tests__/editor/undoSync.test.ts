@@ -203,7 +203,7 @@ describe('MarkdownEditorProvider undo/redo safety', () => {
       type: 'update',
       content: 'fresh content',
       skipResizeWarning: false,
-      imagePath: 'images',
+      imagePath: 'Files',
       imagePathBase: 'relativeToDocument',
     });
   });

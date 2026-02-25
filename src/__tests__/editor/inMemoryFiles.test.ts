@@ -539,6 +539,49 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
   });
 
   describe('handleSaveImage', () => {
+    it('uses Files as the default folder when targetFolder is not provided', async () => {
+      const document = createMockTextDocument('content');
+      document.uri = {
+        scheme: 'file',
+        fsPath: '/workspace/docs/document.md',
+        toString: () => 'file:/workspace/docs/document.md',
+      } as unknown as vscode.Uri;
+
+      (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) = [
+        { uri: { fsPath: '/workspace' } as vscode.Uri } as vscode.WorkspaceFolder,
+      ];
+      (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue({
+        uri: { fsPath: '/workspace' },
+      });
+
+      (vscode.workspace.fs.createDirectory as jest.Mock).mockResolvedValue(undefined);
+      (vscode.workspace.fs.stat as jest.Mock).mockRejectedValue(new Error('ENOENT'));
+      (vscode.workspace.fs.writeFile as jest.Mock).mockResolvedValue(undefined);
+
+      await getProviderInternals().handleSaveImage(
+        {
+          type: 'saveImage',
+          placeholderId: 'placeholder-default',
+          name: 'test.jpg',
+          data: [1, 2, 3],
+        },
+        document as unknown as vscode.TextDocument,
+        mockWebview
+      );
+
+      expect(vscode.workspace.fs.createDirectory).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fsPath: expect.stringMatching(/([A-Za-z]:)?[/\\]workspace[/\\]docs[/\\]Files/),
+        })
+      );
+      expect(mockWebview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'imageSaved',
+          newSrc: './Files/test.jpg',
+        })
+      );
+    });
+
     it('should save image relative to the document folder when imagePathBase=relativeToDocument', async () => {
       const document = createMockTextDocument('content');
       document.uri = {
@@ -908,6 +951,51 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
   });
 
   describe('handleSaveAttachment', () => {
+    it('uses Files as the default folder when targetFolder is not provided', async () => {
+      const document = createMockTextDocument('content');
+      document.uri = {
+        scheme: 'file',
+        fsPath: '/workspace/docs/document.md',
+        toString: () => 'file:/workspace/docs/document.md',
+      } as unknown as vscode.Uri;
+
+      (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) = [
+        { uri: { fsPath: '/workspace' } as vscode.Uri } as vscode.WorkspaceFolder,
+      ];
+      (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue({
+        uri: { fsPath: '/workspace' },
+      });
+
+      (vscode.workspace.fs.createDirectory as jest.Mock).mockResolvedValue(undefined);
+      (vscode.workspace.fs.stat as jest.Mock).mockRejectedValue(new Error('ENOENT'));
+      (vscode.workspace.fs.writeFile as jest.Mock).mockResolvedValue(undefined);
+
+      await getProviderInternals().handleSaveAttachment(
+        {
+          type: 'saveAttachment',
+          requestId: 'req-default',
+          name: 'spec.pdf',
+          data: [1, 2, 3],
+        },
+        document as unknown as vscode.TextDocument,
+        mockWebview
+      );
+
+      expect(vscode.workspace.fs.createDirectory).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fsPath: expect.stringMatching(/([A-Za-z]:)?[/\\]workspace[/\\]docs[/\\]Files/),
+        })
+      );
+      expect(mockWebview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'attachmentSaved',
+          requestId: 'req-default',
+          relativePath: './Files/spec.pdf',
+          linkText: 'spec.pdf',
+        })
+      );
+    });
+
     it('saves attachment relative to document when attachmentPathBase=relativeToDocument', async () => {
       const document = createMockTextDocument('content');
       document.uri = {

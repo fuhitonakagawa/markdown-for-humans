@@ -85,9 +85,9 @@ describe('imageConfirmation', () => {
       expect(getDefaultImagePath()).toBe('new-images');
     });
 
-    it('should fall back to images if window.imagePath is not set', () => {
+    it('should fall back to Files if window.imagePath is not set', () => {
       (global as unknown as { window: { imagePath?: string } }).window.imagePath = undefined;
-      expect(getDefaultImagePath()).toBe('images');
+      expect(getDefaultImagePath()).toBe('Files');
     });
 
     it('should return empty string if window.imagePath is empty string', () => {

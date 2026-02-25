@@ -475,8 +475,8 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
     }
 
     const config = vscode.workspace.getConfiguration();
-    const configured = config.get<string>('markdownForHumans.attachmentPath', 'attachments');
-    return configured && configured.trim() ? configured.trim() : 'attachments';
+    const configured = config.get<string>('markdownForHumans.attachmentPath', 'Files');
+    return configured && configured.trim() ? configured.trim() : 'Files';
   }
 
   private async resolveCollisionSafeTargetPath(
@@ -627,7 +627,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       ) {
         const config = vscode.workspace.getConfiguration();
         const skipWarning = config.get<boolean>('markdownForHumans.imageResize.skipWarning', false);
-        const imagePath = config.get<string>('markdownForHumans.imagePath', 'images');
+        const imagePath = config.get<string>('markdownForHumans.imagePath', 'Files');
         const imagePathBase = config.get<string>(
           'markdownForHumans.imagePathBase',
           'relativeToDocument'
@@ -705,7 +705,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
     // Get skip warning setting
     const config = vscode.workspace.getConfiguration();
     const skipWarning = config.get<boolean>('markdownForHumans.imageResize.skipWarning', false);
-    const imagePath = config.get<string>('markdownForHumans.imagePath', 'images');
+    const imagePath = config.get<string>('markdownForHumans.imagePath', 'Files');
     const imagePathBase = config.get<string>(
       'markdownForHumans.imagePathBase',
       'relativeToDocument'
@@ -744,7 +744,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
         // Also send settings separately
         const config = vscode.workspace.getConfiguration();
         const skipWarning = config.get<boolean>('markdownForHumans.imageResize.skipWarning', false);
-        const imagePath = config.get<string>('markdownForHumans.imagePath', 'images');
+        const imagePath = config.get<string>('markdownForHumans.imagePath', 'Files');
         const imagePathBase = config.get<string>(
           'markdownForHumans.imagePathBase',
           'relativeToDocument'
@@ -1043,7 +1043,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
         }
 
         const config = vscode.workspace.getConfiguration();
-        const imageFolderName = config.get<string>('markdownForHumans.imagePath', 'images');
+        const imageFolderName = config.get<string>('markdownForHumans.imagePath', 'Files');
         const imagesDir = path.join(saveBasePath, imageFolderName);
 
         // Create folder if needed
@@ -1310,7 +1310,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
     const mimeType = message.mimeType as string;
 
     // Use user-selected folder from confirmation dialog
-    const imageFolderName = (message.targetFolder as string) || 'images';
+    const imageFolderName = (message.targetFolder as string) || 'Files';
 
     // Resolve where to save new images (may be doc-relative or workspace-level).
     const saveBasePath = this.getImageStorageBasePath(document);
@@ -2747,7 +2747,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
   ): Promise<void> {
     const absolutePath = message.absolutePath as string;
     const placeholderId = message.placeholderId as string;
-    const targetFolder = (message.targetFolder as string) || 'images';
+    const targetFolder = (message.targetFolder as string) || 'Files';
 
     console.log(`[MD4H] Copying local image to workspace: ${absolutePath}`);
 
@@ -2862,7 +2862,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       // Immediately notify webview of the setting change
       // This ensures the setting takes effect right away without waiting for next update
       const skipWarning = config.get<boolean>('markdownForHumans.imageResize.skipWarning', false);
-      const imagePath = config.get<string>('markdownForHumans.imagePath', 'images');
+      const imagePath = config.get<string>('markdownForHumans.imagePath', 'Files');
       const imagePathBase = config.get<string>(
         'markdownForHumans.imagePathBase',
         'relativeToDocument'
