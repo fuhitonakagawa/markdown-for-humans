@@ -158,7 +158,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
   public static register(context: vscode.ExtensionContext): vscode.Disposable {
     const provider = new MarkdownEditorProvider(context);
     const providerRegistration = vscode.window.registerCustomEditorProvider(
-      'markdownForHumans.editor',
+      'markdownForHumansLocalFork.editor',
       provider,
       {
         webviewOptions: {
@@ -173,9 +173,12 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       void provider.adjustEditorZoom(1);
     });
 
-    const zoomOutCommand = vscode.commands.registerCommand('markdownForHumans.editorZoomOut', () => {
-      void provider.adjustEditorZoom(-1);
-    });
+    const zoomOutCommand = vscode.commands.registerCommand(
+      'markdownForHumans.editorZoomOut',
+      () => {
+        void provider.adjustEditorZoom(-1);
+      }
+    );
 
     const zoomResetCommand = vscode.commands.registerCommand(
       'markdownForHumans.editorZoomReset',
@@ -601,7 +604,9 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
 
     // Handle messages from webview
     webviewPanel.webview.onDidReceiveMessage(
-      e => this.handleWebviewMessage(e, document, webviewPanel.webview),
+      e => {
+        void this.handleWebviewMessage(e, document, webviewPanel.webview, webviewPanel);
+      },
       null,
       this.context.subscriptions
     );
@@ -718,11 +723,12 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
   /**
    * Handle messages from webview
    */
-  private handleWebviewMessage(
+  private async handleWebviewMessage(
     message: { type: string; [key: string]: unknown },
     document: vscode.TextDocument,
-    webview: vscode.Webview
-  ) {
+    webview: vscode.Webview,
+    webviewPanel?: vscode.WebviewPanel
+  ): Promise<void> {
     switch (message.type) {
       case 'edit':
         // Fire-and-forget: errors are handled inside applyEdit and shown to user
@@ -785,6 +791,9 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
           'default',
           vscode.ViewColumn.Beside
         );
+        break;
+      case 'reopenInDefaultEditor':
+        await this.handleReopenInDefaultEditor(document, webviewPanel);
         break;
       case 'openExtensionSettings':
         vscode.commands.executeCommand(
@@ -849,6 +858,34 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       case 'openImage':
         void this.handleOpenImage(message, document);
         break;
+    }
+  }
+
+  /**
+   * Open the current markdown document with VS Code's default text editor
+   * in the same editor group while keeping the WYSIWYG panel open.
+   */
+  private async handleReopenInDefaultEditor(
+    document: vscode.TextDocument,
+    webviewPanel?: vscode.WebviewPanel
+  ): Promise<void> {
+    try {
+      const openOptions: vscode.TextDocumentShowOptions = {
+        preserveFocus: false,
+        preview: false,
+      };
+
+      if (webviewPanel?.viewColumn !== undefined) {
+        openOptions.viewColumn = webviewPanel.viewColumn;
+      }
+
+      await vscode.commands.executeCommand('vscode.openWith', document.uri, 'default', openOptions);
+    } catch (error) {
+      console.error('[MD4H] Failed to reopen in default markdown editor:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      vscode.window.showErrorMessage(
+        `Failed to switch to Markdown text editor: ${errorMessage || 'Unknown error'}`
+      );
     }
   }
 

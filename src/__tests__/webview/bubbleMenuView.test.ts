@@ -110,6 +110,24 @@ describe('BubbleMenuView', () => {
       // Toolbar should register for selection updates
       expect(editor.on).toHaveBeenCalledWith('selectionUpdate', expect.any(Function));
     });
+
+    it('dispatches reopenInDefaultEditor event from return button', () => {
+      const editor = createMockEditor();
+      const toolbar = createFormattingToolbar(editor);
+      const onReopen = jest.fn();
+
+      window.addEventListener('reopenInDefaultEditor', onReopen as EventListener);
+
+      const button = toolbar.querySelector(
+        '.toolbar-button.reopen-markdown-button'
+      ) as HTMLButtonElement | null;
+
+      expect(button).toBeTruthy();
+      button?.click();
+      expect(onReopen).toHaveBeenCalledTimes(1);
+
+      window.removeEventListener('reopenInDefaultEditor', onReopen as EventListener);
+    });
   });
 
   describe('createTableMenu', () => {

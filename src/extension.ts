@@ -73,7 +73,7 @@ export function activate(context: vscode.ExtensionContext) {
         await vscode.commands.executeCommand(
           'vscode.openWith',
           targetUri,
-          'markdownForHumans.editor'
+          'markdownForHumansLocalFork.editor'
         );
       }
     })

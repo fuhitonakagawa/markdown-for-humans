@@ -32,7 +32,11 @@ describe('MarkdownEditorProvider multiple editor support', () => {
     MarkdownEditorProvider.register(context);
 
     expect(window.registerCustomEditorProvider).toHaveBeenCalledTimes(1);
-    const options = (window.registerCustomEditorProvider as jest.Mock).mock.calls[0][2];
+    const registerCall = (window.registerCustomEditorProvider as jest.Mock).mock.calls[0];
+    const viewType = registerCall[0];
+    const options = registerCall[2];
+
+    expect(viewType).toBe('markdownForHumansLocalFork.editor');
 
     expect(options).toMatchObject({
       supportsMultipleEditorsPerDocument: true,
@@ -224,6 +228,79 @@ describe('MarkdownEditorProvider multiple editor support', () => {
         zoomLevel: 1,
         zoomScale: 1.1,
       })
+    );
+  });
+
+  it('opens default editor in the same view column and keeps the current webview panel open', async () => {
+    const provider = new MarkdownEditorProvider({} as unknown as vscode.ExtensionContext);
+    const document = createDocument('content', 'file://reopen.md');
+    const webview = { postMessage: jest.fn() };
+    const panel = {
+      viewColumn: 4,
+      dispose: jest.fn(),
+    };
+
+    (vscode.commands.executeCommand as jest.Mock).mockResolvedValue(undefined);
+
+    await (
+      provider as unknown as {
+        handleWebviewMessage: (
+          message: { type: string; [key: string]: unknown },
+          doc: vscode.TextDocument,
+          wv: { postMessage: jest.Mock },
+          panel: { viewColumn?: number; dispose: jest.Mock }
+        ) => Promise<void>;
+      }
+    ).handleWebviewMessage(
+      { type: 'reopenInDefaultEditor' },
+      document as unknown as vscode.TextDocument,
+      webview,
+      panel
+    );
+
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      'vscode.openWith',
+      document.uri,
+      'default',
+      expect.objectContaining({
+        viewColumn: 4,
+        preserveFocus: false,
+        preview: false,
+      })
+    );
+    expect(panel.dispose).not.toHaveBeenCalled();
+  });
+
+  it('does not dispose the webview panel when reopening in default editor fails', async () => {
+    const provider = new MarkdownEditorProvider({} as unknown as vscode.ExtensionContext);
+    const document = createDocument('content', 'file://reopen-fail.md');
+    const webview = { postMessage: jest.fn() };
+    const panel = {
+      viewColumn: 3,
+      dispose: jest.fn(),
+    };
+
+    (vscode.commands.executeCommand as jest.Mock).mockRejectedValue(new Error('Cannot reopen'));
+
+    await (
+      provider as unknown as {
+        handleWebviewMessage: (
+          message: { type: string; [key: string]: unknown },
+          doc: vscode.TextDocument,
+          wv: { postMessage: jest.Mock },
+          panel: { viewColumn?: number; dispose: jest.Mock }
+        ) => Promise<void>;
+      }
+    ).handleWebviewMessage(
+      { type: 'reopenInDefaultEditor' },
+      document as unknown as vscode.TextDocument,
+      webview,
+      panel
+    );
+
+    expect(panel.dispose).not.toHaveBeenCalled();
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to switch to Markdown text editor')
     );
   });
 });

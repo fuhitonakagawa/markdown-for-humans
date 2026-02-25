@@ -582,6 +582,17 @@ export function createFormattingToolbar(editor: Editor): HTMLElement {
       isActive: () => false,
       className: 'source-button',
     },
+    {
+      type: 'button',
+      label: 'Back to Markdown',
+      title: 'Return to Markdown text editor',
+      icon: { fallback: 'MD' },
+      action: () => {
+        window.dispatchEvent(new CustomEvent('reopenInDefaultEditor'));
+      },
+      isActive: () => false,
+      className: 'reopen-markdown-button',
+    },
     { type: 'separator' },
     {
       type: 'button',

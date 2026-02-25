@@ -1386,6 +1386,12 @@ window.addEventListener('openSourceView', () => {
   vscode.postMessage({ type: 'openSourceView' });
 });
 
+// Handle return to default markdown editor from toolbar button
+window.addEventListener('reopenInDefaultEditor', () => {
+  console.log('[MD4H] Reopening in default markdown editor...');
+  vscode.postMessage({ type: 'reopenInDefaultEditor' });
+});
+
 // Handle settings button from toolbar -> open VS Code settings UI
 window.addEventListener('openExtensionSettings', () => {
   vscode.postMessage({ type: 'openExtensionSettings' });
