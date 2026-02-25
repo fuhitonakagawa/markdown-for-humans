@@ -4,7 +4,7 @@ node_modules/
 # Build outputs
 dist/
 out/
-*.vsix
+# *.vsix
 *.tsbuildinfo
 tsconfig.tsbuildinfo
 

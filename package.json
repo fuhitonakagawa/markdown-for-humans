@@ -1,12 +1,11 @@
 {
   "name": "markdown-for-humans",
-  "displayName": "Markdown for Humans: WYSIWYG Editor",
+  "displayName": "Markdown for Humans: WYSIWYG Editor Local Fork",
   "description": "A full-featured WYSIWYG Markdown editor with visual table editing, drag-and-drop images, Mermaid diagrams, and distraction-free writing—all inside VS Code.",
   "version": "0.1.3",
-  "publisher": "concretio",
+  "publisher": "myfork",
   "author": {
-    "name": "Abhinav",
-    "email": "abhinav@concret.io"
+    "name": "myfork"
   },
   "license": "MIT",
   "icon": "icon.png",
@@ -65,8 +64,8 @@
   "contributes": {
     "customEditors": [
       {
-        "viewType": "markdownForHumans.editor",
-        "displayName": "Markdown for Humans",
+        "viewType": "markdownForHumansLocalFork.editor",
+        "displayName": "Markdown for Humans Local Fork",
         "selector": [
           {
             "filenamePattern": "*.md",
@@ -161,19 +160,19 @@
         "command": "markdownForHumans.editorZoomIn",
         "key": "ctrl+=",
         "mac": "cmd+=",
-        "when": "activeCustomEditorId == markdownForHumans.editor"
+        "when": "activeCustomEditorId == markdownForHumansLocalFork.editor"
       },
       {
         "command": "markdownForHumans.editorZoomOut",
         "key": "ctrl+-",
         "mac": "cmd+-",
-        "when": "activeCustomEditorId == markdownForHumans.editor"
+        "when": "activeCustomEditorId == markdownForHumansLocalFork.editor"
       },
       {
         "command": "markdownForHumans.editorZoomReset",
         "key": "ctrl+0",
         "mac": "cmd+0",
-        "when": "activeCustomEditorId == markdownForHumans.editor"
+        "when": "activeCustomEditorId == markdownForHumansLocalFork.editor"
       }
     ],
     "configuration": {
@@ -181,7 +180,7 @@
       "properties": {
         "markdownForHumans.imagePath": {
           "type": "string",
-          "default": "images",
+          "default": "Files",
           "description": "Folder path for saved images. Interpreted relative to markdownForHumans.imagePathBase."
         },
         "markdownForHumans.imagePathBase": {
@@ -195,7 +194,7 @@
         },
         "markdownForHumans.attachmentPath": {
           "type": "string",
-          "default": "attachments",
+          "default": "Files",
           "description": "Folder path for saved attachments. Interpreted relative to markdownForHumans.attachmentPathBase."
         },
         "markdownForHumans.attachmentPathBase": {
