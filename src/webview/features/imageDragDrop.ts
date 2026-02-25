@@ -100,64 +100,9 @@ const SUPPORTED_IMAGE_TYPES = [
 ];
 
 const IMAGE_PATH_REGEX = /\.(png|jpe?g|gif|webp|svg|bmp|ico)$/i;
-const SUPPORTED_ATTACHMENT_EXTENSIONS = new Set([
-  'pdf',
-  'ipynb',
-  'json',
-  'pptx',
-  'ppt',
-  'docx',
-  'doc',
-  'xlsx',
-  'xls',
-  'csv',
-  'tsv',
-  'txt',
-  'zip',
-  'xml',
-  'yaml',
-  'yml',
-]);
-
-const SUPPORTED_ATTACHMENT_TYPES = new Set([
-  'application/pdf',
-  'application/json',
-  'application/x-ipynb+json',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'application/vnd.ms-powerpoint',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.ms-excel',
-  'text/csv',
-  'text/plain',
-  'application/zip',
-  'application/x-zip-compressed',
-]);
+const HAS_FILE_EXTENSION_REGEX = /\.[^./\\]+$/i;
 
 const pendingAttachmentInserts = new Map<string, number | undefined>();
-
-function extractFileExtension(value: string): string | null {
-  const normalized = value
-    .trim()
-    .split(/[?#]/, 1)[0]
-    .replace(/\\/g, '/');
-  const fileName = normalized.split('/').pop() || '';
-  const dotIndex = fileName.lastIndexOf('.');
-  if (dotIndex <= 0 || dotIndex === fileName.length - 1) {
-    return null;
-  }
-  return fileName.slice(dotIndex + 1).toLowerCase();
-}
-
-function hasSupportedAttachmentExtension(value: string): boolean {
-  const extension = extractFileExtension(value);
-  return extension ? SUPPORTED_ATTACHMENT_EXTENSIONS.has(extension) : false;
-}
-
-function isAttachmentMimeType(mimeType: string): boolean {
-  return SUPPORTED_ATTACHMENT_TYPES.has(mimeType.toLowerCase());
-}
 
 /**
  * Setup image drag & drop and paste handling for the editor
@@ -250,7 +195,7 @@ export function extractAttachmentPathFromDataTransfer(dt: DataTransfer | null): 
   if (!candidate) return null;
 
   const firstLine = candidate.split(/\r?\n/).find(Boolean) || '';
-  return hasSupportedAttachmentExtension(firstLine) ? firstLine : null;
+  return isAttachmentPath(firstLine) ? firstLine : null;
 }
 
 /**
@@ -386,7 +331,7 @@ async function handleDrop(e: DragEvent, editor: Editor, vscodeApi: VsCodeApi): P
     return; // No supported files to process
   }
 
-  // Insert dropped attachments without confirmation dialog.
+  // Insert dropped attachments (PDF) without confirmation dialog.
   const pos = editor.view.posAtCoords({
     left: e.clientX,
     top: e.clientY,
@@ -464,7 +409,9 @@ async function handlePaste(e: ClipboardEvent, editor: Editor, vscodeApi: VsCodeA
   const attachmentFiles = getAttachmentFiles(clipboardData);
   const items = Array.from(clipboardData?.items || []);
   const imageItem = items.find(item => item.type.startsWith('image/'));
-  const attachmentItem = items.find(item => isAttachmentMimeType(item.type));
+  const attachmentItem = items.find(
+    item => item.kind === 'file' && isAttachmentMimeType(item.type)
+  );
 
   // Priority order for paste handling:
   // 1. Image path (workspace files) - highest priority
@@ -777,10 +724,61 @@ export function isImageFile(file: File): boolean {
  * Check if a file is a supported attachment type.
  */
 export function isAttachmentFile(file: File): boolean {
+  if (isImageFile(file)) {
+    return false;
+  }
+
   if (isAttachmentMimeType(file.type)) {
     return true;
   }
-  return hasSupportedAttachmentExtension(file.name);
+
+  return HAS_FILE_EXTENSION_REGEX.test(file.name);
+}
+
+function isAttachmentMimeType(mimeType: string): boolean {
+  if (!mimeType) {
+    return false;
+  }
+  return !mimeType.startsWith('image/');
+}
+
+function isAttachmentPath(rawPath: string): boolean {
+  const normalized = normalizeAttachmentPath(rawPath);
+  if (!normalized) {
+    return false;
+  }
+
+  if (IMAGE_PATH_REGEX.test(normalized)) {
+    return false;
+  }
+
+  return HAS_FILE_EXTENSION_REGEX.test(normalized);
+}
+
+function normalizeAttachmentPath(rawPath: string): string {
+  let value = rawPath.trim();
+  if (!value) {
+    return '';
+  }
+
+  if (value.startsWith('<') && value.endsWith('>')) {
+    value = value.slice(1, -1);
+  }
+
+  const queryIndex = value.indexOf('?');
+  const hashIndex = value.indexOf('#');
+  const cutIndex =
+    queryIndex === -1 ? hashIndex : hashIndex === -1 ? queryIndex : Math.min(queryIndex, hashIndex);
+
+  if (cutIndex !== -1) {
+    value = value.slice(0, cutIndex);
+  }
+
+  if (value.startsWith('file://')) {
+    value = decodeURIComponent(value.replace('file://', ''));
+  }
+
+  return value.trim();
 }
 
 /**

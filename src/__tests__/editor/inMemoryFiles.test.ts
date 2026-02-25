@@ -38,7 +38,12 @@ jest.mock('vscode', () => ({
   },
   window: {
     showInformationMessage: jest.fn(),
+    showWarningMessage: jest.fn(),
     showErrorMessage: jest.fn(),
+    showTextDocument: jest.fn(),
+  },
+  env: {
+    openExternal: jest.fn(),
   },
   workspace: {
     getWorkspaceFolder: jest.fn(),
@@ -50,6 +55,7 @@ jest.mock('vscode', () => ({
     applyEdit: jest.fn(),
     onDidChangeTextDocument: jest.fn(),
     onDidChangeConfiguration: jest.fn(),
+    openTextDocument: jest.fn(),
     fs: {
       createDirectory: jest.fn(),
       writeFile: jest.fn(),
@@ -192,6 +198,10 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
         message: { type: string; imagePath: string; requestId: string },
         doc: vscode.TextDocument,
         webview: { postMessage: jest.Mock }
+      ) => Promise<void>;
+      handleOpenFileLink: (
+        message: { type: string; path: string },
+        doc: vscode.TextDocument
       ) => Promise<void>;
     };
 
@@ -1104,6 +1114,122 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
           relativePath: './attachments/ref.pdf',
           linkText: 'ref.pdf',
           insertPosition: 5,
+        })
+      );
+    });
+  });
+
+  describe('handleOpenFileLink', () => {
+    it('opens file links through vscode.open so editor associations apply', async () => {
+      const document = createMockTextDocument('content');
+      document.uri = {
+        scheme: 'file',
+        fsPath: '/workspace/docs/document.md',
+        toString: () => 'file:/workspace/docs/document.md',
+      } as unknown as vscode.Uri;
+
+      (vscode.workspace.fs.stat as jest.Mock).mockResolvedValue({} as unknown as vscode.FileStat);
+      (vscode.commands.executeCommand as jest.Mock).mockResolvedValue(undefined);
+
+      await getProviderInternals().handleOpenFileLink(
+        {
+          type: 'openFileLink',
+          path: './attachments/spec.pdf',
+        },
+        document as unknown as vscode.TextDocument
+      );
+
+      expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+        'vscode.open',
+        expect.objectContaining({
+          fsPath: expect.stringMatching(
+            /([A-Za-z]:)?[/\\]workspace[/\\]docs[/\\]attachments[/\\]spec\.pdf$/
+          ),
+        })
+      );
+      expect(vscode.env.openExternal).not.toHaveBeenCalled();
+    });
+
+    it('shows an error when vscode.open fails', async () => {
+      const document = createMockTextDocument('content');
+      document.uri = {
+        scheme: 'file',
+        fsPath: '/workspace/docs/document.md',
+        toString: () => 'file:/workspace/docs/document.md',
+      } as unknown as vscode.Uri;
+
+      (vscode.workspace.fs.stat as jest.Mock).mockResolvedValue({} as unknown as vscode.FileStat);
+      (vscode.commands.executeCommand as jest.Mock).mockRejectedValue(new Error('Cannot open'));
+
+      await getProviderInternals().handleOpenFileLink(
+        {
+          type: 'openFileLink',
+          path: './attachments/spec.pdf',
+        },
+        document as unknown as vscode.TextDocument
+      );
+
+      expect(vscode.commands.executeCommand).toHaveBeenCalledWith('vscode.open', expect.anything());
+      expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to open file: Cannot open')
+      );
+      expect(vscode.env.openExternal).not.toHaveBeenCalled();
+    });
+
+    it('resolves URL-encoded links with query/fragment in document-relative path', async () => {
+      const document = createMockTextDocument('content');
+      document.uri = {
+        scheme: 'file',
+        fsPath: '/workspace/docs/document.md',
+        toString: () => 'file:/workspace/docs/document.md',
+      } as unknown as vscode.Uri;
+
+      (vscode.workspace.fs.stat as jest.Mock).mockResolvedValue({} as unknown as vscode.FileStat);
+      (vscode.commands.executeCommand as jest.Mock).mockResolvedValue(undefined);
+
+      await getProviderInternals().handleOpenFileLink(
+        {
+          type: 'openFileLink',
+          path: './attachments/AWS%20Certified%20Solutions%20Architect%20-%20Professional-2.pdf#page=3',
+        },
+        document as unknown as vscode.TextDocument
+      );
+
+      expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+        'vscode.open',
+        expect.objectContaining({
+          fsPath: expect.stringMatching(
+            /([A-Za-z]:)?[/\\]workspace[/\\]docs[/\\]attachments[/\\]AWS Certified Solutions Architect - Professional-2\.pdf$/
+          ),
+        })
+      );
+    });
+
+    it('resolves file:// links before opening', async () => {
+      const document = createMockTextDocument('content');
+      document.uri = {
+        scheme: 'file',
+        fsPath: '/workspace/docs/document.md',
+        toString: () => 'file:/workspace/docs/document.md',
+      } as unknown as vscode.Uri;
+
+      (vscode.workspace.fs.stat as jest.Mock).mockResolvedValue({} as unknown as vscode.FileStat);
+      (vscode.commands.executeCommand as jest.Mock).mockResolvedValue(undefined);
+
+      await getProviderInternals().handleOpenFileLink(
+        {
+          type: 'openFileLink',
+          path: 'file:///workspace/docs/attachments/Deep%20GenAI.pdf',
+        },
+        document as unknown as vscode.TextDocument
+      );
+
+      expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+        'vscode.open',
+        expect.objectContaining({
+          fsPath: expect.stringMatching(
+            /([A-Za-z]:)?[/\\]workspace[/\\]docs[/\\]attachments[/\\]Deep GenAI\.pdf$/
+          ),
         })
       );
     });

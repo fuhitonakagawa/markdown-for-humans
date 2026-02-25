@@ -112,12 +112,17 @@ describe('isAttachmentFile', () => {
     expect(isAttachmentFile(file)).toBe(true);
   });
 
-  it('returns true for .pdf extension even without mime type', () => {
-    const file = createMockFile('doc.pdf', '');
+  it('returns true for JSON files', () => {
+    const file = createMockFile('data.json', 'application/json');
     expect(isAttachmentFile(file)).toBe(true);
   });
 
-  it('returns false for non-pdf files', () => {
+  it('returns true for .ipynb extension even without mime type', () => {
+    const file = createMockFile('notebook.ipynb', '');
+    expect(isAttachmentFile(file)).toBe(true);
+  });
+
+  it('returns false for image files', () => {
     const file = createMockFile('image.png', 'image/png');
     expect(isAttachmentFile(file)).toBe(false);
   });
@@ -220,11 +225,12 @@ describe('attachment file helpers', () => {
   it('detects attachment files in DataTransfer', () => {
     const files = [
       createMockFile('doc.pdf', 'application/pdf'),
+      createMockFile('book.ipynb', ''),
       createMockFile('image.png', 'image/png'),
     ];
     const dt = createMockDataTransfer(files);
     expect(hasAttachmentFiles(dt)).toBe(true);
-    expect(getAttachmentFiles(dt)).toHaveLength(1);
+    expect(getAttachmentFiles(dt)).toHaveLength(2);
     expect(getAttachmentFiles(dt)[0].name).toBe('doc.pdf');
   });
 
@@ -233,8 +239,13 @@ describe('attachment file helpers', () => {
     expect(extractAttachmentPathFromDataTransfer(dt)).toBe('file:///tmp/manual.pdf');
   });
 
-  it('returns null when text payload is not PDF path', () => {
+  it('extracts non-image attachment paths from text payload', () => {
     const dt = createMockDataTransfer([], { 'text/plain': '/workspace/docs/readme.md' });
+    expect(extractAttachmentPathFromDataTransfer(dt)).toBe('/workspace/docs/readme.md');
+  });
+
+  it('returns null when text payload is an image path', () => {
+    const dt = createMockDataTransfer([], { 'text/plain': '/workspace/docs/screenshot.png' });
     expect(extractAttachmentPathFromDataTransfer(dt)).toBeNull();
   });
 });

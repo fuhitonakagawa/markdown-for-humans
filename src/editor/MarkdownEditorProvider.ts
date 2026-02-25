@@ -2495,6 +2495,37 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
   }
 
   /**
+   * Normalize local file link path values coming from markdown href attributes.
+   *
+   * Handles URL-encoded segments, file:// URIs, and strips query/fragment parts
+   * so filesystem resolution works with paths such as:
+   * - ./attachments/Deep%20GenAI.pdf#page=2
+   * - file:///Users/name/docs/file.pdf
+   */
+  private normalizeFileLinkPath(rawPath: string): string {
+    let normalizedPath = normalizeImagePath(rawPath.trim());
+
+    if (normalizedPath.startsWith('<') && normalizedPath.endsWith('>')) {
+      normalizedPath = normalizedPath.slice(1, -1);
+    }
+
+    const queryIndex = normalizedPath.indexOf('?');
+    const hashIndex = normalizedPath.indexOf('#');
+    const cutIndex =
+      queryIndex === -1
+        ? hashIndex
+        : hashIndex === -1
+          ? queryIndex
+          : Math.min(queryIndex, hashIndex);
+
+    if (cutIndex !== -1) {
+      normalizedPath = normalizedPath.slice(0, cutIndex);
+    }
+
+    return normalizedPath;
+  }
+
+  /**
    * Handle file link navigation (open file in VS Code)
    */
   private async handleOpenFileLink(
@@ -2502,8 +2533,9 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
     document: vscode.TextDocument
   ): Promise<void> {
     try {
-      const filePath = (message.path as string) || '';
-      console.log('[MD4H] handleOpenFileLink called with path:', filePath);
+      const rawFilePath = (message.path as string) || '';
+      const filePath = this.normalizeFileLinkPath(rawFilePath);
+      console.log('[MD4H] handleOpenFileLink called with path:', rawFilePath, '->', filePath);
 
       if (!filePath) {
         console.warn('[MD4H] No path provided for file link');
@@ -2553,60 +2585,10 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
         return;
       }
 
-      // Check if file is an image
-      const imageExtensions = [
-        '.png',
-        '.jpg',
-        '.jpeg',
-        '.gif',
-        '.svg',
-        '.webp',
-        '.bmp',
-        '.ico',
-        '.tiff',
-        '.tif',
-      ];
-      const fileExtension = path.extname(fileUri.fsPath).toLowerCase();
-      const isImage = imageExtensions.includes(fileExtension);
-      console.log('[MD4H] File extension:', fileExtension, '| Is image:', isImage);
-
-      if (isImage) {
-        // For image files, use vscode.open command directly
-        // This automatically opens images in VS Code's image preview
-        console.log('[MD4H] Attempting to open image file with vscode.open command');
-        try {
-          await vscode.commands.executeCommand('vscode.open', fileUri);
-          console.log('[MD4H] Successfully opened image file:', fileUri.fsPath);
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          console.error('[MD4H] Failed to open image file:', errorMessage, error);
-          vscode.window.showErrorMessage(`Failed to open image file: ${errorMessage}`);
-        }
-      } else {
-        // For text files, use openTextDocument
-        console.log('[MD4H] Attempting to open text file with openTextDocument');
-        try {
-          const doc = await vscode.workspace.openTextDocument(fileUri);
-          await vscode.window.showTextDocument(doc);
-          console.log('[MD4H] Successfully opened file link:', fileUri.fsPath);
-        } catch (error) {
-          // If it's not a text file, try vscode.open command as fallback
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          console.log('[MD4H] openTextDocument failed, error:', errorMessage);
-          if (errorMessage.includes('Binary') || errorMessage.includes('binary')) {
-            console.log('[MD4H] File is binary, trying vscode.open command as fallback');
-            try {
-              await vscode.commands.executeCommand('vscode.open', fileUri);
-              console.log('[MD4H] Opened binary file using vscode.open command');
-            } catch (fallbackError) {
-              console.error('[MD4H] Failed to open file:', fallbackError);
-              vscode.window.showErrorMessage(`Failed to open file: ${errorMessage}`);
-            }
-          } else {
-            throw error;
-          }
-        }
-      }
+      // Open with VS Code's normal file opening behavior so editor associations apply
+      // (e.g., PDF preview extensions, notebook editor for .ipynb, etc.)
+      await vscode.commands.executeCommand('vscode.open', fileUri);
+      console.log('[MD4H] Successfully opened file link via vscode.open:', fileUri.fsPath);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('[MD4H] Failed to open file link:', errorMessage, error);
