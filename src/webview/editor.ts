@@ -41,6 +41,7 @@ import { shouldAutoLink } from './utils/linkValidation';
 import { buildOutlineFromEditor } from './utils/outline';
 import { scrollToHeading } from './utils/scrollToHeading';
 import { collectExportContent, getDocumentTitle } from './utils/exportContent';
+import { resolveUpnoteShortcut, runUpnoteShortcut } from './utils/upnoteShortcuts';
 
 // Helper function for slug generation (same as in linkDialog)
 function generateHeadingSlug(text: string, existingSlugs: Set<string>): string {
@@ -652,6 +653,15 @@ function initializeEditor(initialContent: string) {
         e.stopPropagation(); // Stop event from reaching VS Code
         console.log(`[MD4H] Intercepted Cmd+${e.key.toUpperCase()} for editor`);
         // TipTap will handle the formatting
+        return;
+      }
+
+      const isEditorFocused = editorInstance.isFocused || editorInstance.view.hasFocus();
+      const upnoteShortcut = resolveUpnoteShortcut(e, isEditorFocused);
+      if (upnoteShortcut) {
+        e.preventDefault();
+        e.stopPropagation();
+        runUpnoteShortcut(editorInstance, upnoteShortcut);
         return;
       }
 
