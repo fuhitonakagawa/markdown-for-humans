@@ -20,6 +20,7 @@ import { lowlight } from 'lowlight';
 import { Mermaid } from './extensions/mermaid';
 import { IndentedImageCodeBlock } from './extensions/indentedImageCodeBlock';
 import { SpaceFriendlyImagePaths } from './extensions/spaceFriendlyImagePaths';
+import { EditorDropCursor } from './extensions/dropCursor';
 import { TabIndentation } from './extensions/tabIndentation';
 import { GitHubAlerts } from './extensions/githubAlerts';
 import { ImageEnterSpacing } from './extensions/imageEnterSpacing';
@@ -400,6 +401,7 @@ function initializeEditor(initialContent: string) {
         IndentedImageCodeBlock,
         // Fallback: treat standalone image lines with spaces in the path as images.
         SpaceFriendlyImagePaths,
+        EditorDropCursor,
         // GitHubAlerts must be before StarterKit to intercept alert blockquotes
         GitHubAlerts,
         StarterKit.configure({
@@ -479,27 +481,32 @@ function initializeEditor(initialContent: string) {
           const dt = event.dataTransfer;
           if (!dt) return false;
 
-          // Case 1: Actual image files (from desktop/finder)
+          // Case 1: Actual image/PDF files (from desktop/finder)
           if (dt.files && dt.files.length > 0) {
-            const hasImages = Array.from(dt.files).some(f => f.type.startsWith('image/'));
-            if (hasImages) {
+            const hasImagesOrAttachments = Array.from(dt.files).some(
+              f =>
+                f.type.startsWith('image/') ||
+                f.type === 'application/pdf' ||
+                /\.pdf$/i.test(f.name)
+            );
+            if (hasImagesOrAttachments) {
               return true; // Prevent default, our DOM handler will manage it
             }
           }
 
           // Case 2: VS Code file explorer drops (passes URI as text)
-          // Check for text/uri-list or text/plain containing image paths
+          // Check for text/uri-list or text/plain containing image/PDF paths
           const uriList = dt.getData('text/uri-list') || dt.getData('text/plain') || '';
           if (uriList) {
-            const isImagePath = /\.(png|jpe?g|gif|webp|svg|bmp|ico)$/i.test(uriList);
-            if (isImagePath) {
+            const isSupportedPath = /\.(png|jpe?g|gif|webp|svg|bmp|ico|pdf)$/i.test(uriList);
+            if (isSupportedPath) {
               // This is a file path drop from VS Code - prevent TipTap's default
               // Our DOM handler will process it
               return true;
             }
           }
 
-          return false; // Allow default for non-image drops
+          return false; // Allow default for unsupported drops
         },
       },
       onUpdate: ({ editor }) => {

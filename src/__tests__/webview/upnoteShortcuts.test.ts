@@ -87,11 +87,13 @@ describe('runUpnoteShortcut', () => {
     };
   }
 
-  it.each<[
-    UpnoteShortcutCommand,
-    'toggleHeading' | 'toggleBulletList' | 'toggleOrderedList' | 'toggleTaskList',
-    unknown
-  ]>([
+  it.each<
+    [
+      UpnoteShortcutCommand,
+      'toggleHeading' | 'toggleBulletList' | 'toggleOrderedList' | 'toggleTaskList',
+      unknown,
+    ]
+  >([
     ['heading1', 'toggleHeading', { level: 1 }],
     ['heading2', 'toggleHeading', { level: 2 }],
     ['heading3', 'toggleHeading', { level: 3 }],
@@ -110,9 +112,9 @@ describe('runUpnoteShortcut', () => {
     expect(chainApi.focus).toHaveBeenCalledTimes(1);
 
     if (args === undefined) {
-      expect((chainApi[method] as jest.Mock)).toHaveBeenCalledTimes(1);
+      expect(chainApi[method] as jest.Mock).toHaveBeenCalledTimes(1);
     } else {
-      expect((chainApi[method] as jest.Mock)).toHaveBeenCalledWith(args);
+      expect(chainApi[method] as jest.Mock).toHaveBeenCalledWith(args);
     }
 
     expect(chainApi.run).toHaveBeenCalledTimes(1);

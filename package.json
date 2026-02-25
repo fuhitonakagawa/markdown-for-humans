@@ -161,6 +161,20 @@
           "default": "relativeToDocument",
           "description": "Controls whether Image Path is relative to the current markdown file folder or the workspace folder."
         },
+        "markdownForHumans.attachmentPath": {
+          "type": "string",
+          "default": "attachments",
+          "description": "Folder path for saved attachments (PDF). Interpreted relative to markdownForHumans.attachmentPathBase."
+        },
+        "markdownForHumans.attachmentPathBase": {
+          "type": "string",
+          "enum": [
+            "relativeToDocument",
+            "workspaceFolder"
+          ],
+          "default": "relativeToDocument",
+          "description": "Controls whether Attachment Path is relative to the current markdown file folder or the workspace folder."
+        },
         "markdownForHumans.chromePath": {
           "type": "string",
           "default": "",

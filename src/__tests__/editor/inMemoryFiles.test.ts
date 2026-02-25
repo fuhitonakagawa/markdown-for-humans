@@ -157,6 +157,17 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
         doc: vscode.TextDocument,
         webview: { postMessage: jest.Mock }
       ) => Promise<void>;
+      handleSaveAttachment: (
+        message: {
+          type: string;
+          requestId: string;
+          name: string;
+          data: number[];
+          targetFolder?: string;
+        },
+        doc: vscode.TextDocument,
+        webview: { postMessage: jest.Mock }
+      ) => Promise<void>;
       handleCopyLocalImageToWorkspace: (
         message: {
           type: string;
@@ -172,6 +183,11 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
         doc: vscode.TextDocument,
         webview: { postMessage: jest.Mock }
       ) => void;
+      handleWorkspaceAttachment: (
+        message: { type: string; sourcePath: string; fileName: string; insertPosition: number },
+        doc: vscode.TextDocument,
+        webview: { postMessage: jest.Mock }
+      ) => Promise<void>;
       handleCheckImageInWorkspace: (
         message: { type: string; imagePath: string; requestId: string },
         doc: vscode.TextDocument,
@@ -876,6 +892,218 @@ describe('MarkdownEditorProvider - In-Memory File Support', () => {
         expect.objectContaining({
           type: 'insertWorkspaceImage',
           relativePath: expect.stringContaining('images/photo.jpg'),
+        })
+      );
+    });
+  });
+
+  describe('handleSaveAttachment', () => {
+    it('saves attachment relative to document when attachmentPathBase=relativeToDocument', async () => {
+      const document = createMockTextDocument('content');
+      document.uri = {
+        scheme: 'file',
+        fsPath: '/workspace/docs/document.md',
+        toString: () => 'file:/workspace/docs/document.md',
+      } as unknown as vscode.Uri;
+
+      (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) = [
+        { uri: { fsPath: '/workspace' } as vscode.Uri } as vscode.WorkspaceFolder,
+      ];
+      (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue({
+        uri: { fsPath: '/workspace' },
+      });
+      (vscode.workspace.getConfiguration as jest.Mock).mockReturnValue({
+        get: jest.fn((key: string, defaultValue?: unknown) => {
+          if (key === 'markdownForHumans.attachmentPath') return 'attachments';
+          if (key === 'markdownForHumans.attachmentPathBase') return 'relativeToDocument';
+          return defaultValue;
+        }),
+        update: jest.fn(),
+      });
+
+      (vscode.workspace.fs.createDirectory as jest.Mock).mockResolvedValue(undefined);
+      (vscode.workspace.fs.stat as jest.Mock).mockRejectedValue(new Error('ENOENT'));
+      (vscode.workspace.fs.writeFile as jest.Mock).mockResolvedValue(undefined);
+
+      await getProviderInternals().handleSaveAttachment(
+        {
+          type: 'saveAttachment',
+          requestId: 'req-1',
+          name: 'spec.pdf',
+          data: [1, 2, 3],
+        },
+        document as unknown as vscode.TextDocument,
+        mockWebview
+      );
+
+      expect(vscode.workspace.fs.createDirectory).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fsPath: expect.stringMatching(/([A-Za-z]:)?[/\\]workspace[/\\]docs[/\\]attachments/),
+        })
+      );
+      expect(mockWebview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'attachmentSaved',
+          requestId: 'req-1',
+          relativePath: './attachments/spec.pdf',
+          linkText: 'spec.pdf',
+        })
+      );
+    });
+
+    it('adds suffix when attachment filename already exists', async () => {
+      const document = createMockTextDocument('content');
+      document.uri = {
+        scheme: 'untitled',
+        toString: () => 'untitled:Untitled-1',
+      } as unknown as vscode.Uri;
+      (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) = [
+        { uri: { fsPath: '/workspace' } as vscode.Uri } as vscode.WorkspaceFolder,
+      ];
+      (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue(null);
+      (vscode.workspace.getConfiguration as jest.Mock).mockReturnValue({
+        get: jest.fn((key: string, defaultValue?: unknown) => {
+          if (key === 'markdownForHumans.attachmentPath') return 'attachments';
+          if (key === 'markdownForHumans.attachmentPathBase') return 'workspaceFolder';
+          return defaultValue;
+        }),
+        update: jest.fn(),
+      });
+
+      (vscode.workspace.fs.createDirectory as jest.Mock).mockResolvedValue(undefined);
+      (vscode.workspace.fs.writeFile as jest.Mock).mockResolvedValue(undefined);
+      (vscode.workspace.fs.stat as jest.Mock).mockImplementation((uri: unknown) => {
+        const fsPath = getUriFsPath(uri)
+          .replace(/\\/g, '/')
+          .replace(/^[A-Za-z]:/, '');
+        if (fsPath.endsWith('/workspace/attachments/spec.pdf')) {
+          return Promise.resolve({} as unknown as vscode.FileStat);
+        }
+        if (fsPath.endsWith('/workspace/attachments/spec-2.pdf')) {
+          return Promise.reject(new Error('ENOENT'));
+        }
+        return Promise.reject(new Error(`Unexpected path: ${fsPath}`));
+      });
+
+      await getProviderInternals().handleSaveAttachment(
+        {
+          type: 'saveAttachment',
+          requestId: 'req-2',
+          name: 'spec.pdf',
+          data: [4, 5, 6],
+        },
+        document as unknown as vscode.TextDocument,
+        mockWebview
+      );
+
+      expect(vscode.workspace.fs.writeFile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fsPath: expect.stringMatching(
+            /([A-Za-z]:)?[/\\]workspace[/\\]attachments[/\\]spec-2\.pdf$/
+          ),
+        }),
+        expect.any(Uint8Array)
+      );
+      expect(mockWebview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'attachmentSaved',
+          requestId: 'req-2',
+          relativePath: './attachments/spec-2.pdf',
+        })
+      );
+    });
+  });
+
+  describe('handleWorkspaceAttachment', () => {
+    it('inserts relative link directly when dropped PDF is inside workspace', async () => {
+      const document = createMockTextDocument('content');
+      document.uri = {
+        scheme: 'file',
+        fsPath: '/workspace/docs/document.md',
+        toString: () => 'file:/workspace/docs/document.md',
+      } as unknown as vscode.Uri;
+
+      (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) = [
+        { uri: { fsPath: '/workspace' } as vscode.Uri } as vscode.WorkspaceFolder,
+      ];
+      (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue({
+        uri: { fsPath: '/workspace' },
+      });
+
+      await getProviderInternals().handleWorkspaceAttachment(
+        {
+          type: 'handleWorkspaceAttachment',
+          sourcePath: '/workspace/files/ref.pdf',
+          fileName: 'ref.pdf',
+          insertPosition: 0,
+        },
+        document as unknown as vscode.TextDocument,
+        mockWebview
+      );
+
+      expect(mockWebview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'insertWorkspaceAttachment',
+          relativePath: '../files/ref.pdf',
+          linkText: 'ref.pdf',
+          insertPosition: 0,
+        })
+      );
+    });
+
+    it('copies dropped PDF from outside workspace into attachment folder', async () => {
+      const document = createMockTextDocument('content');
+      document.uri = {
+        scheme: 'file',
+        fsPath: '/workspace/docs/document.md',
+        toString: () => 'file:/workspace/docs/document.md',
+      } as unknown as vscode.Uri;
+
+      (vscode.workspace.workspaceFolders as unknown as vscode.WorkspaceFolder[] | undefined) = [
+        { uri: { fsPath: '/workspace' } as vscode.Uri } as vscode.WorkspaceFolder,
+      ];
+      (vscode.workspace.getWorkspaceFolder as jest.Mock).mockReturnValue({
+        uri: { fsPath: '/workspace' },
+      });
+      (vscode.workspace.getConfiguration as jest.Mock).mockReturnValue({
+        get: jest.fn((key: string, defaultValue?: unknown) => {
+          if (key === 'markdownForHumans.attachmentPath') return 'attachments';
+          if (key === 'markdownForHumans.attachmentPathBase') return 'relativeToDocument';
+          return defaultValue;
+        }),
+        update: jest.fn(),
+      });
+
+      (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(new Uint8Array([7, 8, 9]));
+      (vscode.workspace.fs.createDirectory as jest.Mock).mockResolvedValue(undefined);
+      (vscode.workspace.fs.stat as jest.Mock).mockRejectedValue(new Error('ENOENT'));
+      (vscode.workspace.fs.writeFile as jest.Mock).mockResolvedValue(undefined);
+
+      await getProviderInternals().handleWorkspaceAttachment(
+        {
+          type: 'handleWorkspaceAttachment',
+          sourcePath: '/outside/ref.pdf',
+          fileName: 'ref.pdf',
+          insertPosition: 5,
+        },
+        document as unknown as vscode.TextDocument,
+        mockWebview
+      );
+
+      expect(vscode.workspace.fs.writeFile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fsPath: expect.stringMatching(
+            /([A-Za-z]:)?[/\\]workspace[/\\]docs[/\\]attachments[/\\]ref\.pdf$/
+          ),
+        }),
+        expect.any(Uint8Array)
+      );
+      expect(mockWebview.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'insertWorkspaceAttachment',
+          relativePath: './attachments/ref.pdf',
+          linkText: 'ref.pdf',
+          insertPosition: 5,
         })
       );
     });

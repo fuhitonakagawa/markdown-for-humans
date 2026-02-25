@@ -100,6 +100,64 @@ const SUPPORTED_IMAGE_TYPES = [
 ];
 
 const IMAGE_PATH_REGEX = /\.(png|jpe?g|gif|webp|svg|bmp|ico)$/i;
+const SUPPORTED_ATTACHMENT_EXTENSIONS = new Set([
+  'pdf',
+  'ipynb',
+  'json',
+  'pptx',
+  'ppt',
+  'docx',
+  'doc',
+  'xlsx',
+  'xls',
+  'csv',
+  'tsv',
+  'txt',
+  'zip',
+  'xml',
+  'yaml',
+  'yml',
+]);
+
+const SUPPORTED_ATTACHMENT_TYPES = new Set([
+  'application/pdf',
+  'application/json',
+  'application/x-ipynb+json',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
+  'text/csv',
+  'text/plain',
+  'application/zip',
+  'application/x-zip-compressed',
+]);
+
+const pendingAttachmentInserts = new Map<string, number | undefined>();
+
+function extractFileExtension(value: string): string | null {
+  const normalized = value
+    .trim()
+    .split(/[?#]/, 1)[0]
+    .replace(/\\/g, '/');
+  const fileName = normalized.split('/').pop() || '';
+  const dotIndex = fileName.lastIndexOf('.');
+  if (dotIndex <= 0 || dotIndex === fileName.length - 1) {
+    return null;
+  }
+  return fileName.slice(dotIndex + 1).toLowerCase();
+}
+
+function hasSupportedAttachmentExtension(value: string): boolean {
+  const extension = extractFileExtension(value);
+  return extension ? SUPPORTED_ATTACHMENT_EXTENSIONS.has(extension) : false;
+}
+
+function isAttachmentMimeType(mimeType: string): boolean {
+  return SUPPORTED_ATTACHMENT_TYPES.has(mimeType.toLowerCase());
+}
 
 /**
  * Setup image drag & drop and paste handling for the editor
@@ -113,7 +171,6 @@ export function setupImageDragDrop(editor: Editor, vscodeApi: VsCodeApi): void {
 
   // Drag over styling
   editorElement.addEventListener('dragover', handleDragOver);
-  editorElement.addEventListener('dragleave', handleDragLeave);
   editorElement.addEventListener('drop', e => handleDrop(e as DragEvent, editor, vscodeApi));
 
   // Paste handling
@@ -122,33 +179,45 @@ export function setupImageDragDrop(editor: Editor, vscodeApi: VsCodeApi): void {
   // Listen for image save confirmations from extension
   window.addEventListener('message', event => handleImageMessage(event, editor));
 
-  // Guard against VS Code opening a new window when dropping images outside the editor
-  const blockWindowDrop = (e: DragEvent) => {
-    if (hasImageFiles(e.dataTransfer) || extractImagePathFromDataTransfer(e.dataTransfer)) {
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.dataTransfer) {
-        e.dataTransfer.dropEffect = 'none';
-      }
+  const hasSupportedWindowDropPayload = (dt: DataTransfer | null): boolean =>
+    hasFileTransferPayload(dt) ||
+    Boolean(extractImagePathFromDataTransfer(dt)) ||
+    Boolean(extractAttachmentPathFromDataTransfer(dt));
+
+  // Guard against VS Code opening dropped files instead of inserting them into the editor.
+  const blockWindowDragOver = (e: DragEvent) => {
+    if (!hasSupportedWindowDropPayload(e.dataTransfer)) {
+      return;
     }
+    e.preventDefault();
+    e.stopPropagation();
   };
 
-  // Clear drag-over styling when leaving the window entirely
-  const handleWindowDragLeave = (e: DragEvent) => {
-    if (e.relatedTarget === null) {
-      editorElement.classList.remove('drag-over');
+  // Handle file drops anywhere in the webview, not only inside `.ProseMirror`.
+  const handleWindowDrop = (e: DragEvent) => {
+    if (!hasSupportedWindowDropPayload(e.dataTransfer)) {
+      return;
     }
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const dropTarget = e.target as Node | null;
+    if (dropTarget && editorElement.contains(dropTarget)) {
+      // editorElement already has its own `drop` listener.
+      return;
+    }
+
+    void handleDrop(e, editor, vscodeApi);
   };
 
-  window.addEventListener('dragover', blockWindowDrop);
-  window.addEventListener('drop', blockWindowDrop);
-  window.addEventListener('dragleave', handleWindowDragLeave as EventListener);
+  window.addEventListener('dragover', blockWindowDragOver);
+  window.addEventListener('drop', handleWindowDrop);
 
   // Clean up window listeners when editor is destroyed to prevent memory leaks
   editor.on('destroy', () => {
-    window.removeEventListener('dragover', blockWindowDrop);
-    window.removeEventListener('drop', blockWindowDrop);
-    window.removeEventListener('dragleave', handleWindowDragLeave as EventListener);
+    window.removeEventListener('dragover', blockWindowDragOver);
+    window.removeEventListener('drop', handleWindowDrop);
   });
 }
 
@@ -169,31 +238,36 @@ export function extractImagePathFromDataTransfer(dt: DataTransfer | null): strin
 }
 
 /**
+ * Extract an attachment path (text/uri-list or text/plain) from a DataTransfer
+ */
+export function extractAttachmentPathFromDataTransfer(dt: DataTransfer | null): string | null {
+  if (!dt) return null;
+
+  const uriList = dt.getData('text/uri-list') || '';
+  const textPlain = dt.getData('text/plain') || '';
+
+  const candidate = (uriList || textPlain).trim();
+  if (!candidate) return null;
+
+  const firstLine = candidate.split(/\r?\n/).find(Boolean) || '';
+  return hasSupportedAttachmentExtension(firstLine) ? firstLine : null;
+}
+
+/**
  * Handle dragover event - show drop zone styling
  */
 function handleDragOver(e: Event): void {
   const dragEvent = e as DragEvent;
   dragEvent.preventDefault();
 
+  const hasAnyFilePayload = hasFileTransferPayload(dragEvent.dataTransfer);
   const hasFiles = hasImageFiles(dragEvent.dataTransfer);
+  const hasAttachmentFile = hasAttachmentFiles(dragEvent.dataTransfer);
   const hasImagePath = extractImagePathFromDataTransfer(dragEvent.dataTransfer);
+  const hasAttachmentPath = extractAttachmentPathFromDataTransfer(dragEvent.dataTransfer);
 
-  if (hasFiles || hasImagePath) {
-    dragEvent.dataTransfer!.dropEffect = 'copy';
-    (e.currentTarget as Element).classList.add('drag-over');
-  }
-}
-
-/**
- * Handle dragleave event - remove drop zone styling
- */
-function handleDragLeave(e: Event): void {
-  const dragEvent = e as DragEvent;
-  const target = e.currentTarget as Element;
-
-  // Only remove if leaving the editor entirely
-  if (!target.contains(dragEvent.relatedTarget as Node)) {
-    target.classList.remove('drag-over');
+  if (hasAnyFilePayload || hasFiles || hasAttachmentFile || hasImagePath || hasAttachmentPath) {
+    return;
   }
 }
 
@@ -242,34 +316,88 @@ async function handleWorkspaceImageDrop(
 }
 
 /**
+ * Handle workspace attachment drop (from VS Code file explorer)
+ * These come as file:// URIs or absolute paths, not File objects.
+ */
+async function handleWorkspaceAttachmentDrop(
+  uriOrPath: string,
+  editor: Editor,
+  vscodeApi: VsCodeApi,
+  e?: DragEvent,
+  insertPosOverride?: number
+): Promise<void> {
+  let filePath = uriOrPath.trim();
+  if (filePath.startsWith('file://')) {
+    filePath = decodeURIComponent(filePath.replace('file://', ''));
+  }
+
+  const fileName = filePath.split('/').pop() || 'attachment.bin';
+  const pos =
+    insertPosOverride ??
+    (e
+      ? editor.view.posAtCoords({
+          left: e.clientX,
+          top: e.clientY,
+        })?.pos
+      : editor.state.selection.from);
+
+  vscodeApi.postMessage({
+    type: 'handleWorkspaceAttachment',
+    sourcePath: filePath,
+    fileName,
+    insertPosition: pos,
+  });
+}
+
+/**
  * Handle drop event - insert dropped images
  * NO SHIFT KEY REQUIRED for better user experience
  */
 async function handleDrop(e: DragEvent, editor: Editor, vscodeApi: VsCodeApi): Promise<void> {
   e.preventDefault();
-  (e.currentTarget as Element).classList.remove('drag-over');
 
   const dt = e.dataTransfer;
   if (!dt) return;
 
   // Case 1: Check for actual File objects (from desktop/finder)
-  const files = getImageFiles(dt);
+  const imageFiles = getImageFiles(dt);
+  const attachmentFiles = getAttachmentFiles(dt);
   console.log('[MD4H] Drop payload types:', {
     types: Array.from(dt.types || []),
     fileCount: dt.files?.length || 0,
-    hasImageFiles: files.length > 0,
+    hasImageFiles: imageFiles.length > 0,
+    hasAttachmentFiles: attachmentFiles.length > 0,
   });
 
   // Case 2: Check for VS Code file explorer drops (URI as text)
-  if (files.length === 0) {
+  if (imageFiles.length === 0 && attachmentFiles.length === 0) {
     const imagePath = extractImagePathFromDataTransfer(dt);
     if (imagePath) {
       // This is a workspace file path - handle it specially
       await handleWorkspaceImageDrop(imagePath, editor, vscodeApi, e);
       return;
     }
-    console.log('[MD4H] Drop ignored: no image files or image paths detected');
-    return; // No images to process
+    const attachmentPath = extractAttachmentPathFromDataTransfer(dt);
+    if (attachmentPath) {
+      await handleWorkspaceAttachmentDrop(attachmentPath, editor, vscodeApi, e);
+      return;
+    }
+    console.log('[MD4H] Drop ignored: no supported image/attachment payload detected');
+    return; // No supported files to process
+  }
+
+  // Insert dropped attachments without confirmation dialog.
+  const pos = editor.view.posAtCoords({
+    left: e.clientX,
+    top: e.clientY,
+  });
+
+  for (const file of attachmentFiles) {
+    await insertAttachment(editor, file, vscodeApi, pos?.pos);
+  }
+
+  if (imageFiles.length === 0) {
+    return;
   }
 
   // Check if we have a remembered folder preference
@@ -277,7 +405,7 @@ async function handleDrop(e: DragEvent, editor: Editor, vscodeApi: VsCodeApi): P
 
   // If no remembered preference, show confirmation dialog
   if (!targetFolder) {
-    const options = await confirmImageDrop(files.length, getDefaultImagePath());
+    const options = await confirmImageDrop(imageFiles.length, getDefaultImagePath());
     if (!options) {
       // User cancelled
       return;
@@ -291,14 +419,8 @@ async function handleDrop(e: DragEvent, editor: Editor, vscodeApi: VsCodeApi): P
     }
   }
 
-  // Get drop position in editor
-  const pos = editor.view.posAtCoords({
-    left: e.clientX,
-    top: e.clientY,
-  });
-
   // Insert all dropped images
-  for (const file of files) {
+  for (const file of imageFiles) {
     // Check if image is huge and show dialog
     let resizeOptions: { width: number; height: number } | undefined;
     if (isHugeImage(file)) {
@@ -337,9 +459,12 @@ async function handleDrop(e: DragEvent, editor: Editor, vscodeApi: VsCodeApi): P
 async function handlePaste(e: ClipboardEvent, editor: Editor, vscodeApi: VsCodeApi): Promise<void> {
   const clipboardData = e.clipboardData as DataTransfer | null;
   const imagePath = extractImagePathFromDataTransfer(clipboardData);
-  const files = getImageFiles(clipboardData);
+  const attachmentPath = extractAttachmentPathFromDataTransfer(clipboardData);
+  const imageFiles = getImageFiles(clipboardData);
+  const attachmentFiles = getAttachmentFiles(clipboardData);
   const items = Array.from(clipboardData?.items || []);
   const imageItem = items.find(item => item.type.startsWith('image/'));
+  const attachmentItem = items.find(item => isAttachmentMimeType(item.type));
 
   // Priority order for paste handling:
   // 1. Image path (workspace files) - highest priority
@@ -359,15 +484,35 @@ async function handlePaste(e: ClipboardEvent, editor: Editor, vscodeApi: VsCodeA
     return;
   }
 
-  // Pasted files (e.g., screenshots provided as File)
-  // IMPORTANT: Check this BEFORE imageItem to prevent double insertion
-  // When copying images from browser, clipboard has BOTH File and data URL
-  if (files.length > 0) {
+  if (attachmentPath) {
     e.preventDefault();
+    await handleWorkspaceAttachmentDrop(
+      attachmentPath,
+      editor,
+      vscodeApi,
+      undefined,
+      editor.state.selection.from
+    );
+    return;
+  }
+
+  // Pasted files (e.g., screenshots provided as File)
+  // IMPORTANT: Check this BEFORE item-based fallback to prevent double insertion.
+  if (imageFiles.length > 0 || attachmentFiles.length > 0) {
+    e.preventDefault();
+
+    const pos = editor.state.selection.from;
+    for (const file of attachmentFiles) {
+      await insertAttachment(editor, file, vscodeApi, pos);
+    }
+
+    if (imageFiles.length === 0) {
+      return;
+    }
 
     let targetFolder = getRememberedFolder();
     if (!targetFolder) {
-      const options = await confirmImageDrop(files.length, getDefaultImagePath());
+      const options = await confirmImageDrop(imageFiles.length, getDefaultImagePath());
       if (!options) {
         return;
       }
@@ -377,8 +522,7 @@ async function handlePaste(e: ClipboardEvent, editor: Editor, vscodeApi: VsCodeA
       }
     }
 
-    const pos = editor.state.selection.from;
-    for (const file of files) {
+    for (const file of imageFiles) {
       // Check if image is huge and show dialog
       let resizeOptions: { width: number; height: number } | undefined;
       if (isHugeImage(file)) {
@@ -405,6 +549,16 @@ async function handlePaste(e: ClipboardEvent, editor: Editor, vscodeApi: VsCodeA
       }
 
       await insertImage(editor, file, vscodeApi, targetFolder, 'pasted', pos, resizeOptions);
+    }
+    return;
+  }
+
+  // Binary clipboard attachment (no file path)
+  if (attachmentItem) {
+    e.preventDefault();
+    const file = attachmentItem.getAsFile();
+    if (file && isAttachmentFile(file)) {
+      await insertAttachment(editor, file, vscodeApi, editor.state.selection.from);
     }
     return;
   }
@@ -469,7 +623,10 @@ function handleImageMessage(event: MessageEvent, editor: Editor): void {
   if (
     message.type === 'imageSaved' ||
     message.type === 'imageError' ||
-    message.type === 'insertWorkspaceImage'
+    message.type === 'insertWorkspaceImage' ||
+    message.type === 'attachmentSaved' ||
+    message.type === 'attachmentError' ||
+    message.type === 'insertWorkspaceAttachment'
   ) {
     console.log('[MD4H] Received message from extension:', message.type, message);
   }
@@ -503,6 +660,23 @@ function handleImageMessage(event: MessageEvent, editor: Editor): void {
         `[MD4H] Inserting workspace image: ${message.relativePath}, alt: ${message.altText}`
       );
       insertWorkspaceImage(editor, message.relativePath, message.altText, message.insertPosition);
+      break;
+    }
+    case 'attachmentSaved': {
+      const requestId = message.requestId as string;
+      const insertPosition = pendingAttachmentInserts.get(requestId);
+      pendingAttachmentInserts.delete(requestId);
+      insertFileLink(editor, message.relativePath, message.linkText, insertPosition);
+      break;
+    }
+    case 'insertWorkspaceAttachment': {
+      insertFileLink(editor, message.relativePath, message.linkText, message.insertPosition);
+      break;
+    }
+    case 'attachmentError': {
+      const requestId = message.requestId as string;
+      pendingAttachmentInserts.delete(requestId);
+      console.error('[MD4H] Attachment save failed:', message.error);
       break;
     }
   }
@@ -559,6 +733,14 @@ export function hasImageFiles(dt: DataTransfer | null): boolean {
 }
 
 /**
+ * DataTransfer can expose a generic file payload before individual file metadata is available.
+ */
+export function hasFileTransferPayload(dt: DataTransfer | null): boolean {
+  if (!dt) return false;
+  return Array.from(dt.types).includes('Files');
+}
+
+/**
  * Get image files from DataTransfer
  */
 export function getImageFiles(dt: DataTransfer | null): File[] {
@@ -567,10 +749,38 @@ export function getImageFiles(dt: DataTransfer | null): File[] {
 }
 
 /**
+ * Check if DataTransfer contains supported attachment files.
+ */
+export function hasAttachmentFiles(dt: DataTransfer | null): boolean {
+  if (!dt) return false;
+  return (
+    Array.from(dt.types).includes('Files') && Array.from(dt.files).some(f => isAttachmentFile(f))
+  );
+}
+
+/**
+ * Get attachment files from DataTransfer.
+ */
+export function getAttachmentFiles(dt: DataTransfer | null): File[] {
+  if (!dt) return [];
+  return Array.from(dt.files).filter(f => isAttachmentFile(f));
+}
+
+/**
  * Check if a file is a supported image type
  */
 export function isImageFile(file: File): boolean {
   return SUPPORTED_IMAGE_TYPES.includes(file.type);
+}
+
+/**
+ * Check if a file is a supported attachment type.
+ */
+export function isAttachmentFile(file: File): boolean {
+  if (isAttachmentMimeType(file.type)) {
+    return true;
+  }
+  return hasSupportedAttachmentExtension(file.name);
 }
 
 /**
@@ -702,6 +912,70 @@ export async function insertImage(
   } catch (error) {
     console.error('[MD4H] Failed to insert image:', error);
   }
+}
+
+function resolveTextInsertPosition(editor: EditorForInsertPosition, pos?: number): number {
+  const fallback = editor.state.selection.from;
+  if (pos === undefined) {
+    return fallback;
+  }
+
+  const maxPos = editor.state.doc.content.size;
+  if (pos < 0 || pos > maxPos) {
+    return fallback;
+  }
+
+  return pos;
+}
+
+/**
+ * Save an attachment file through the extension host and insert a markdown link when saved.
+ */
+async function insertAttachment(
+  editor: Editor,
+  file: File,
+  vscodeApi: VsCodeApi,
+  pos?: number
+): Promise<void> {
+  const requestId = `attachment-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  const safePos = resolveTextInsertPosition(editor, pos);
+  pendingAttachmentInserts.set(requestId, safePos);
+
+  try {
+    const buffer = await file.arrayBuffer();
+    vscodeApi.postMessage({
+      type: 'saveAttachment',
+      requestId,
+      name: file.name || 'attachment.bin',
+      data: Array.from(new Uint8Array(buffer)),
+    });
+  } catch (error) {
+    pendingAttachmentInserts.delete(requestId);
+    console.error('[MD4H] Failed to prepare attachment for save:', error);
+  }
+}
+
+/**
+ * Insert a markdown file link using TipTap link marks.
+ */
+function insertFileLink(
+  editor: Editor,
+  relativePath: string,
+  linkText: string,
+  pos?: number
+): void {
+  const safePos = resolveTextInsertPosition(editor, pos);
+  const displayText = (linkText || '').trim() || relativePath.split('/').pop() || relativePath;
+
+  editor
+    .chain()
+    .focus()
+    .insertContentAt(safePos, {
+      type: 'text',
+      text: displayText,
+      marks: [{ type: 'link', attrs: { href: relativePath } }],
+    })
+    .run();
 }
 
 /**

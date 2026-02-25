@@ -344,6 +344,102 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
   }
 
   /**
+   * Get the base directory where new attachments should be saved.
+   */
+  private getAttachmentStorageBasePath(document: vscode.TextDocument): string | null {
+    const config = vscode.workspace.getConfiguration();
+    const attachmentPathBase = config.get<string>(
+      'markdownForHumans.attachmentPathBase',
+      'relativeToDocument'
+    );
+
+    // Untitled docs should default to workspace-level saves when possible.
+    if (document.uri.scheme === 'untitled') {
+      return this.getWorkspaceFolderPath(document) ?? this.getImageBasePath(document);
+    }
+
+    if (attachmentPathBase === 'workspaceFolder') {
+      return this.getWorkspaceFolderPath(document) ?? this.getImageBasePath(document);
+    }
+
+    // Default: relativeToDocument
+    return (
+      this.getDocumentDirectory(document) ?? this.getWorkspaceFolderPath(document) ?? os.homedir()
+    );
+  }
+
+  private getAttachmentFolderName(message: { [key: string]: unknown }): string {
+    const fromMessage = message.targetFolder as string | undefined;
+    if (fromMessage && fromMessage.trim()) {
+      return fromMessage.trim();
+    }
+
+    const config = vscode.workspace.getConfiguration();
+    const configured = config.get<string>('markdownForHumans.attachmentPath', 'attachments');
+    return configured && configured.trim() ? configured.trim() : 'attachments';
+  }
+
+  private async resolveCollisionSafeTargetPath(
+    targetDir: string,
+    preferredFilename: string,
+    label: 'image' | 'attachment'
+  ): Promise<{ absolutePath: string; fileUri: vscode.Uri; finalFilename: string }> {
+    const parsedName = path.parse(preferredFilename);
+    const baseFilename = parsedName.name || label;
+    const extension = parsedName.ext || '';
+
+    let finalFilename = preferredFilename;
+    let targetPath = path.join(targetDir, finalFilename);
+    let targetUri = vscode.Uri.file(targetPath);
+
+    const fileExists = async (uri: vscode.Uri): Promise<boolean> => {
+      try {
+        await vscode.workspace.fs.stat(uri);
+        return true;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes('ENOENT') || message.includes('FileNotFound')) {
+          return false;
+        }
+        throw error;
+      }
+    };
+
+    if (await fileExists(targetUri)) {
+      let foundAvailableName = false;
+      for (let suffix = 2; suffix < 1000; suffix += 1) {
+        finalFilename = `${baseFilename}-${suffix}${extension}`;
+        targetPath = path.join(targetDir, finalFilename);
+        targetUri = vscode.Uri.file(targetPath);
+        if (!(await fileExists(targetUri))) {
+          foundAvailableName = true;
+          break;
+        }
+      }
+
+      if (!foundAvailableName) {
+        throw new Error(
+          `Cannot save ${label}: too many existing files matching "${baseFilename}-N${extension}"`
+        );
+      }
+    }
+
+    return {
+      absolutePath: targetPath,
+      fileUri: targetUri,
+      finalFilename,
+    };
+  }
+
+  private toMarkdownRelativePath(fromDir: string, targetPath: string): string {
+    let relativePath = path.relative(fromDir, targetPath).replace(/\\/g, '/');
+    if (!relativePath.startsWith('..') && !relativePath.startsWith('./')) {
+      relativePath = './' + relativePath;
+    }
+    return relativePath;
+  }
+
+  /**
    * Called when our custom editor is opened
    */
   public async resolveCustomTextEditor(
@@ -565,8 +661,14 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       case 'saveImage':
         this.handleSaveImage(message, document, webview);
         break;
+      case 'saveAttachment':
+        void this.handleSaveAttachment(message, document, webview);
+        break;
       case 'handleWorkspaceImage':
         void this.handleWorkspaceImage(message, document, webview);
+        break;
+      case 'handleWorkspaceAttachment':
+        void this.handleWorkspaceAttachment(message, document, webview);
         break;
       case 'resolveImageUri':
         this.handleResolveImageUri(message, document, webview);
@@ -898,6 +1000,158 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       altText,
       insertPosition,
     });
+  }
+
+  /**
+   * Save attachment data sent from webview and return a relative markdown link path.
+   */
+  private async handleSaveAttachment(
+    message: { type: string; [key: string]: unknown },
+    document: vscode.TextDocument,
+    webview: vscode.Webview
+  ): Promise<void> {
+    const requestId = message.requestId as string;
+    const name = message.name as string;
+    const data = message.data as number[];
+    const attachmentFolderName = this.getAttachmentFolderName(message);
+
+    const saveBasePath = this.getAttachmentStorageBasePath(document);
+    if (!saveBasePath) {
+      const errorMessage = 'Cannot save attachment: no base directory available';
+      vscode.window.showErrorMessage(errorMessage);
+      webview.postMessage({
+        type: 'attachmentError',
+        requestId,
+        error: errorMessage,
+      });
+      return;
+    }
+
+    try {
+      const attachmentsDir = path.join(saveBasePath, attachmentFolderName);
+      await vscode.workspace.fs.createDirectory(vscode.Uri.file(attachmentsDir));
+
+      const safeTarget = await this.resolveCollisionSafeTargetPath(
+        attachmentsDir,
+        name,
+        'attachment'
+      );
+      await vscode.workspace.fs.writeFile(safeTarget.fileUri, new Uint8Array(data));
+
+      const markdownDir =
+        document.uri.scheme === 'file' ? path.dirname(document.uri.fsPath) : saveBasePath;
+      const relativePath = this.toMarkdownRelativePath(markdownDir, safeTarget.absolutePath);
+
+      webview.postMessage({
+        type: 'attachmentSaved',
+        requestId,
+        relativePath,
+        linkText: safeTarget.finalFilename,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      vscode.window.showErrorMessage(`Failed to save attachment: ${errorMessage}`);
+      webview.postMessage({
+        type: 'attachmentError',
+        requestId,
+        error: errorMessage,
+      });
+    }
+  }
+
+  /**
+   * Handle attachment drops from workspace/file explorer.
+   * If the file is outside workspace/document base, copy it into attachment folder first.
+   */
+  private async handleWorkspaceAttachment(
+    message: { type: string; [key: string]: unknown },
+    document: vscode.TextDocument,
+    webview: vscode.Webview
+  ): Promise<void> {
+    const sourcePath = message.sourcePath as string;
+    const fileName = message.fileName as string;
+    const insertPosition = message.insertPosition as number | undefined;
+
+    const markdownBasePath = this.getImageBasePath(document);
+    if (!markdownBasePath) {
+      const errorMessage = 'Cannot insert attachment: no base directory available';
+      vscode.window.showErrorMessage(errorMessage);
+      webview.postMessage({
+        type: 'attachmentError',
+        requestId: `workspace-${Date.now()}`,
+        error: errorMessage,
+      });
+      return;
+    }
+
+    const workspaceScope = this.getWorkspaceFolderPath(document) ?? markdownBasePath;
+    const normalizedSource = path.normalize(sourcePath);
+    const normalizedScope = path.normalize(workspaceScope);
+    const withinWorkspace = this.isWithinWorkspace(normalizedSource, normalizedScope);
+
+    let relativePath = path.relative(markdownBasePath, normalizedSource).replace(/\\/g, '/');
+    const isValidPath = this.isValidRelativePath(relativePath);
+
+    if (isValidPath && withinWorkspace) {
+      if (!relativePath.startsWith('..') && !relativePath.startsWith('./')) {
+        relativePath = './' + relativePath;
+      }
+
+      webview.postMessage({
+        type: 'insertWorkspaceAttachment',
+        relativePath,
+        linkText: fileName,
+        insertPosition,
+      });
+      return;
+    }
+
+    try {
+      const sourceUri = vscode.Uri.file(normalizedSource);
+      const fileData = await vscode.workspace.fs.readFile(sourceUri);
+
+      const saveBasePath = this.getAttachmentStorageBasePath(document);
+      if (!saveBasePath) {
+        const errorMessage = 'Cannot copy attachment: no base directory available';
+        vscode.window.showErrorMessage(errorMessage);
+        webview.postMessage({
+          type: 'attachmentError',
+          requestId: `workspace-${Date.now()}`,
+          error: errorMessage,
+        });
+        return;
+      }
+
+      const attachmentFolderName = this.getAttachmentFolderName(message);
+      const attachmentsDir = path.join(saveBasePath, attachmentFolderName);
+      await vscode.workspace.fs.createDirectory(vscode.Uri.file(attachmentsDir));
+
+      const safeTarget = await this.resolveCollisionSafeTargetPath(
+        attachmentsDir,
+        path.basename(normalizedSource),
+        'attachment'
+      );
+      await vscode.workspace.fs.writeFile(safeTarget.fileUri, fileData);
+
+      const markdownDir =
+        document.uri.scheme === 'file' ? path.dirname(document.uri.fsPath) : saveBasePath;
+      const copiedRelativePath = this.toMarkdownRelativePath(markdownDir, safeTarget.absolutePath);
+
+      webview.postMessage({
+        type: 'insertWorkspaceAttachment',
+        relativePath: copiedRelativePath,
+        linkText: safeTarget.finalFilename,
+        insertPosition,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      vscode.window.showErrorMessage(`Failed to copy attachment: ${errorMessage}`);
+      webview.postMessage({
+        type: 'attachmentError',
+        requestId: `workspace-${Date.now()}`,
+        error: errorMessage,
+      });
+    }
   }
 
   /**

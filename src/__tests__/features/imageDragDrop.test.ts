@@ -6,9 +6,14 @@
  */
 
 import {
+  hasFileTransferPayload,
   hasImageFiles,
   getImageFiles,
   isImageFile,
+  hasAttachmentFiles,
+  getAttachmentFiles,
+  isAttachmentFile,
+  extractAttachmentPathFromDataTransfer,
   generateImageName,
   fileToBase64,
   extractImagePathFromDataTransfer,
@@ -101,6 +106,23 @@ describe('isImageFile', () => {
   });
 });
 
+describe('isAttachmentFile', () => {
+  it('returns true for PDF mime type', () => {
+    const file = createMockFile('doc.pdf', 'application/pdf');
+    expect(isAttachmentFile(file)).toBe(true);
+  });
+
+  it('returns true for .pdf extension even without mime type', () => {
+    const file = createMockFile('doc.pdf', '');
+    expect(isAttachmentFile(file)).toBe(true);
+  });
+
+  it('returns false for non-pdf files', () => {
+    const file = createMockFile('image.png', 'image/png');
+    expect(isAttachmentFile(file)).toBe(false);
+  });
+});
+
 describe('hasImageFiles', () => {
   it('should return true when DataTransfer contains image files', () => {
     const files = [createMockFile('test.png', 'image/png')];
@@ -130,6 +152,24 @@ describe('hasImageFiles', () => {
 
   it('should return false when DataTransfer is null', () => {
     expect(hasImageFiles(null)).toBe(false);
+  });
+});
+
+describe('hasFileTransferPayload', () => {
+  it('returns true when DataTransfer reports Files payload', () => {
+    const dt = {
+      files: [],
+      types: ['Files'],
+      items: [],
+      getData: () => '',
+    } as unknown as DataTransfer;
+
+    expect(hasFileTransferPayload(dt)).toBe(true);
+  });
+
+  it('returns false when DataTransfer has no Files payload', () => {
+    const dt = createMockDataTransfer([], { 'text/plain': '/tmp/doc.md' });
+    expect(hasFileTransferPayload(dt)).toBe(false);
   });
 });
 
@@ -173,6 +213,29 @@ describe('getImageFiles', () => {
     const result = getImageFiles(dt);
 
     expect(result).toHaveLength(3);
+  });
+});
+
+describe('attachment file helpers', () => {
+  it('detects attachment files in DataTransfer', () => {
+    const files = [
+      createMockFile('doc.pdf', 'application/pdf'),
+      createMockFile('image.png', 'image/png'),
+    ];
+    const dt = createMockDataTransfer(files);
+    expect(hasAttachmentFiles(dt)).toBe(true);
+    expect(getAttachmentFiles(dt)).toHaveLength(1);
+    expect(getAttachmentFiles(dt)[0].name).toBe('doc.pdf');
+  });
+
+  it('extracts PDF path from uri list', () => {
+    const dt = createMockDataTransfer([], { 'text/uri-list': 'file:///tmp/manual.pdf' });
+    expect(extractAttachmentPathFromDataTransfer(dt)).toBe('file:///tmp/manual.pdf');
+  });
+
+  it('returns null when text payload is not PDF path', () => {
+    const dt = createMockDataTransfer([], { 'text/plain': '/workspace/docs/readme.md' });
+    expect(extractAttachmentPathFromDataTransfer(dt)).toBeNull();
   });
 });
 
