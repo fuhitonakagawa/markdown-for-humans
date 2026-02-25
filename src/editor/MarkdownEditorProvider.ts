@@ -135,11 +135,20 @@ export function updateFilenameDimensions(
  * Provides WYSIWYG editing using TipTap in a webview
  */
 export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
+  private static readonly PENDING_EDIT_WINDOW_MS = 100;
+
   // Track pending edits to avoid feedback loops
-  // Key: document URI, Value: timestamp of last edit from webview
-  private pendingEdits = new Map<string, number>();
-  // Remember last content sent from the webview so we can skip redundant updates
-  private lastWebviewContent = new Map<string, string>();
+  // Key: document URI, Value: pending edit metadata (timestamp + source webview key)
+  private pendingEdits = new Map<string, { timestamp: number; sourceWebviewKey?: string }>();
+  // Track all active webviews for a document so split views stay in sync
+  private webviewsByDocument = new Map<string, Set<vscode.Webview>>();
+  // Keep one document subscription per URI instead of one per panel
+  private documentChangeSubscriptions = new Map<string, vscode.Disposable>();
+  // Map webviews to stable IDs used for per-view deduplication
+  private webviewKeys = new WeakMap<vscode.Webview, string>();
+  private webviewKeyCounter = 0;
+  // Remember last content sent to each webview (not per document)
+  private lastWebviewContentByView = new Map<string, string>();
 
   public static register(context: vscode.ExtensionContext): vscode.Disposable {
     const provider = new MarkdownEditorProvider(context);
@@ -151,13 +160,88 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
           retainContextWhenHidden: true,
           enableFindWidget: true,
         },
-        supportsMultipleEditorsPerDocument: false,
+        supportsMultipleEditorsPerDocument: true,
       }
     );
     return providerRegistration;
   }
 
   constructor(private readonly context: vscode.ExtensionContext) {}
+
+  private getWebviewKey(webview: vscode.Webview): string {
+    const existingKey = this.webviewKeys.get(webview);
+    if (existingKey) {
+      return existingKey;
+    }
+
+    const newKey = `webview-${++this.webviewKeyCounter}`;
+    this.webviewKeys.set(webview, newKey);
+    return newKey;
+  }
+
+  private registerWebviewForDocument(document: vscode.TextDocument, webview: vscode.Webview): void {
+    const docUri = document.uri.toString();
+    let webviews = this.webviewsByDocument.get(docUri);
+    if (!webviews) {
+      webviews = new Set<vscode.Webview>();
+      this.webviewsByDocument.set(docUri, webviews);
+    }
+
+    webviews.add(webview);
+    this.getWebviewKey(webview);
+
+    if (this.documentChangeSubscriptions.has(docUri)) {
+      return;
+    }
+
+    const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument(e => {
+      if (e.document.uri.toString() !== docUri) {
+        return;
+      }
+      this.updateWebviewsForDocument(e.document);
+    });
+
+    this.documentChangeSubscriptions.set(docUri, changeDocumentSubscription);
+  }
+
+  private unregisterWebviewForDocument(
+    document: vscode.TextDocument,
+    webview: vscode.Webview
+  ): void {
+    const docUri = document.uri.toString();
+    const webviewKey = this.getWebviewKey(webview);
+    this.lastWebviewContentByView.delete(webviewKey);
+
+    const webviews = this.webviewsByDocument.get(docUri);
+    if (!webviews) {
+      return;
+    }
+
+    webviews.delete(webview);
+    if (webviews.size > 0) {
+      return;
+    }
+
+    this.webviewsByDocument.delete(docUri);
+    this.pendingEdits.delete(docUri);
+
+    const changeDocumentSubscription = this.documentChangeSubscriptions.get(docUri);
+    if (changeDocumentSubscription) {
+      changeDocumentSubscription.dispose();
+      this.documentChangeSubscriptions.delete(docUri);
+    }
+  }
+
+  private updateWebviewsForDocument(document: vscode.TextDocument): void {
+    const webviews = this.webviewsByDocument.get(document.uri.toString());
+    if (!webviews || webviews.size === 0) {
+      return;
+    }
+
+    for (const webview of webviews) {
+      this.updateWebview(document, webview);
+    }
+  }
 
   /**
    * Get the document directory for file-based documents, or workspace folder for untitled files
@@ -320,12 +404,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
 
     // Set webview HTML
     webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview);
-    // Update webview when document changes
-    const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument(e => {
-      if (e.document.uri.toString() === document.uri.toString()) {
-        this.updateWebview(document, webviewPanel.webview);
-      }
-    });
+    this.registerWebviewForDocument(document, webviewPanel.webview);
 
     // Handle messages from webview
     webviewPanel.webview.onDidReceiveMessage(
@@ -373,11 +452,8 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
 
     // Cleanup
     webviewPanel.onDidDispose(() => {
-      changeDocumentSubscription.dispose();
       configChangeSubscription.dispose();
-      // Clean up pending edits tracking for this document
-      this.pendingEdits.delete(document.uri.toString());
-      this.lastWebviewContent.delete(document.uri.toString());
+      this.unregisterWebviewForDocument(document, webviewPanel.webview);
       if (getActiveWebviewPanel() === webviewPanel) {
         setActiveWebviewPanel(undefined);
       }
@@ -388,29 +464,39 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
    * Send document content to webview
    * Skips update if it's from a recent webview edit (avoid feedback loop)
    */
-  private updateWebview(document: vscode.TextDocument, webview: vscode.Webview) {
+  private updateWebview(
+    document: vscode.TextDocument,
+    webview: vscode.Webview,
+    options: { force?: boolean } = {}
+  ) {
+    const force = options.force ?? false;
     const docUri = document.uri.toString();
-    const lastEditTime = this.pendingEdits.get(docUri);
+    const webviewKey = this.getWebviewKey(webview);
+    const pendingEdit = this.pendingEdits.get(docUri);
     const currentContent = document.getText();
 
     // Skip update if content matches what we already sent from the webview
-    const lastSentContent = this.lastWebviewContent.get(docUri);
-    if (lastSentContent !== undefined && lastSentContent === currentContent) {
+    const lastSentContent = this.lastWebviewContentByView.get(webviewKey);
+    if (!force && lastSentContent !== undefined && lastSentContent === currentContent) {
       return;
     }
 
-    // Skip update if this change came from webview within last 100ms
-    // This prevents feedback loops while allowing external Git changes to sync
-    if (lastEditTime && Date.now() - lastEditTime < 100) {
+    // Skip rapid echo updates for the source webview only.
+    // Other split views must still receive the update.
+    if (
+      !force &&
+      pendingEdit &&
+      Date.now() - pendingEdit.timestamp < MarkdownEditorProvider.PENDING_EDIT_WINDOW_MS &&
+      (!pendingEdit.sourceWebviewKey || pendingEdit.sourceWebviewKey === webviewKey)
+    ) {
       return;
     }
 
     // Transform content for webview (wrap frontmatter in code block)
     const transformedContent = this.wrapFrontmatterForWebview(currentContent);
 
-    // Remember the ORIGINAL content (what we expect back from webview after unwrapping)
-    // This prevents false dirty state when webview sends back unwrapped frontmatter
-    this.lastWebviewContent.set(docUri, currentContent);
+    // Remember content sent to this specific webview to avoid duplicate posts.
+    this.lastWebviewContentByView.set(webviewKey, currentContent);
 
     // Get skip warning setting
     const config = vscode.workspace.getConfiguration();
@@ -441,7 +527,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
     switch (message.type) {
       case 'edit':
         // Fire-and-forget: errors are handled inside applyEdit and shown to user
-        void this.applyEdit(message.content as string, document);
+        void this.applyEdit(message.content as string, document, webview);
         break;
       case 'save':
         // Trigger VS Code's save command
@@ -449,7 +535,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
         break;
       case 'ready': {
         // Webview is ready, send initial content and settings
-        this.updateWebview(document, webview);
+        this.updateWebview(document, webview, { force: true });
         // Also send settings separately
         const config = vscode.workspace.getConfiguration();
         const skipWarning = config.get<boolean>('markdownForHumans.imageResize.skipWarning', false);
@@ -2425,7 +2511,11 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
    * @returns Promise resolving to true if edit succeeded, false otherwise
    * @throws Never - errors are caught and shown to user
    */
-  private async applyEdit(content: string, document: vscode.TextDocument): Promise<boolean> {
+  private async applyEdit(
+    content: string,
+    document: vscode.TextDocument,
+    sourceWebview?: vscode.Webview
+  ): Promise<boolean> {
     // Skip if content unchanged (avoid redundant edits)
     const unwrappedContent = this.unwrapFrontmatterFromWebview(content);
     if (unwrappedContent === document.getText()) {
@@ -2434,8 +2524,11 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
 
     // Mark this edit to prevent feedback loop
     const docUri = document.uri.toString();
-    this.pendingEdits.set(docUri, Date.now());
-    this.lastWebviewContent.set(docUri, unwrappedContent);
+    const sourceWebviewKey = sourceWebview ? this.getWebviewKey(sourceWebview) : undefined;
+    this.pendingEdits.set(docUri, { timestamp: Date.now(), sourceWebviewKey });
+    if (sourceWebviewKey) {
+      this.lastWebviewContentByView.set(sourceWebviewKey, unwrappedContent);
+    }
 
     const edit = new vscode.WorkspaceEdit();
 

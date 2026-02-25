@@ -65,6 +65,7 @@ export const window = {
   showWarningMessage: jest.fn(),
   onDidChangeActiveTextEditor: jest.fn(() => ({ dispose: jest.fn() })),
   onDidChangeTextEditorSelection: jest.fn(() => ({ dispose: jest.fn() })),
+  registerCustomEditorProvider: jest.fn(() => ({ dispose: jest.fn() })),
   withProgress: jest.fn((_options, task) => {
     return task(
       {

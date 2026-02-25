@@ -158,11 +158,15 @@ describe('MarkdownEditorProvider undo/redo safety', () => {
     const provider = new MarkdownEditorProvider({} as unknown as vscode.ExtensionContext);
     const document = createDocument('same content');
     const webview = { postMessage: jest.fn() };
+    const webviewKey = (
+      provider as unknown as {
+        getWebviewKey: (wv: { postMessage: jest.Mock }) => string;
+      }
+    ).getWebviewKey(webview);
 
-    (provider as unknown as { lastWebviewContent: Map<string, string> }).lastWebviewContent.set(
-      document.uri.toString(),
-      'same content'
-    );
+    (
+      provider as unknown as { lastWebviewContentByView: Map<string, string> }
+    ).lastWebviewContentByView.set(webviewKey, 'same content');
 
     (
       provider as unknown as {
@@ -177,11 +181,15 @@ describe('MarkdownEditorProvider undo/redo safety', () => {
     const provider = new MarkdownEditorProvider({} as unknown as vscode.ExtensionContext);
     const document = createDocument('fresh content');
     const webview = { postMessage: jest.fn() };
+    const webviewKey = (
+      provider as unknown as {
+        getWebviewKey: (wv: { postMessage: jest.Mock }) => string;
+      }
+    ).getWebviewKey(webview);
 
-    (provider as unknown as { lastWebviewContent: Map<string, string> }).lastWebviewContent.set(
-      document.uri.toString(),
-      'old content'
-    );
+    (
+      provider as unknown as { lastWebviewContentByView: Map<string, string> }
+    ).lastWebviewContentByView.set(webviewKey, 'old content');
 
     (
       provider as unknown as {
