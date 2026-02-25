@@ -19,12 +19,7 @@ import type { Editor } from '@tiptap/core';
 import type { Node as ProseMirrorNode, Schema as ProseMirrorSchema } from '@tiptap/pm/model';
 import { Fragment, Slice } from '@tiptap/pm/model';
 import { dropPoint } from '@tiptap/pm/transform';
-import {
-  confirmImageDrop,
-  getRememberedFolder,
-  setRememberedFolder,
-  getDefaultImagePath,
-} from './imageConfirmation';
+import { getRememberedFolder, getDefaultImagePath } from './imageConfirmation';
 import { showHugeImageDialog, isHugeImage } from './hugeImageDialog';
 
 /**
@@ -103,6 +98,23 @@ const IMAGE_PATH_REGEX = /\.(png|jpe?g|gif|webp|svg|bmp|ico)$/i;
 const HAS_FILE_EXTENSION_REGEX = /\.[^./\\]+$/i;
 
 const pendingAttachmentInserts = new Map<string, number | undefined>();
+
+/**
+ * Resolve target folder without showing a confirmation modal.
+ * Prefers remembered folder, then configured default, then `Files`.
+ */
+export function resolveAutoImageTargetFolder(
+  rememberedFolder: string | null | undefined,
+  defaultFolder: string | null | undefined
+): string {
+  const remembered = rememberedFolder?.trim();
+  if (remembered) {
+    return remembered;
+  }
+
+  const configuredDefault = defaultFolder?.trim();
+  return configuredDefault || 'Files';
+}
 
 /**
  * Setup image drag & drop and paste handling for the editor
@@ -345,24 +357,7 @@ async function handleDrop(e: DragEvent, editor: Editor, vscodeApi: VsCodeApi): P
     return;
   }
 
-  // Check if we have a remembered folder preference
-  let targetFolder = getRememberedFolder();
-
-  // If no remembered preference, show confirmation dialog
-  if (!targetFolder) {
-    const options = await confirmImageDrop(imageFiles.length, getDefaultImagePath());
-    if (!options) {
-      // User cancelled
-      return;
-    }
-
-    targetFolder = options.targetFolder;
-
-    // Remember choice if requested
-    if (options.rememberChoice) {
-      setRememberedFolder(targetFolder);
-    }
-  }
+  const targetFolder = resolveAutoImageTargetFolder(getRememberedFolder(), getDefaultImagePath());
 
   // Insert all dropped images
   for (const file of imageFiles) {
@@ -457,17 +452,7 @@ async function handlePaste(e: ClipboardEvent, editor: Editor, vscodeApi: VsCodeA
       return;
     }
 
-    let targetFolder = getRememberedFolder();
-    if (!targetFolder) {
-      const options = await confirmImageDrop(imageFiles.length, getDefaultImagePath());
-      if (!options) {
-        return;
-      }
-      targetFolder = options.targetFolder;
-      if (options.rememberChoice) {
-        setRememberedFolder(targetFolder);
-      }
-    }
+    const targetFolder = resolveAutoImageTargetFolder(getRememberedFolder(), getDefaultImagePath());
 
     for (const file of imageFiles) {
       // Check if image is huge and show dialog
@@ -515,20 +500,10 @@ async function handlePaste(e: ClipboardEvent, editor: Editor, vscodeApi: VsCodeA
     e.preventDefault();
     const file = imageItem.getAsFile();
     if (file) {
-      let targetFolder = getRememberedFolder();
-
-      if (!targetFolder) {
-        const options = await confirmImageDrop(1, getDefaultImagePath());
-        if (!options) {
-          return;
-        }
-
-        targetFolder = options.targetFolder;
-
-        if (options.rememberChoice) {
-          setRememberedFolder(targetFolder);
-        }
-      }
+      const targetFolder = resolveAutoImageTargetFolder(
+        getRememberedFolder(),
+        getDefaultImagePath()
+      );
 
       // Check if image is huge and show dialog
       let resizeOptions: { width: number; height: number } | undefined;

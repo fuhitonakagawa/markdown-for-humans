@@ -14,18 +14,14 @@
  */
 
 import { Editor } from '@tiptap/core';
-import {
-  confirmImageDrop,
-  getRememberedFolder,
-  setRememberedFolder,
-  getDefaultImagePath,
-} from './imageConfirmation';
+import { getRememberedFolder, getDefaultImagePath } from './imageConfirmation';
 import { showHugeImageDialog, isHugeImage } from './hugeImageDialog';
 import {
   isImageFile,
   insertImage,
   extractImagePathFromDataTransfer,
   hasImageFiles,
+  resolveAutoImageTargetFolder,
 } from './imageDragDrop';
 
 /**
@@ -77,7 +73,10 @@ export async function showImageInsertDialog(editor: Editor, vscodeApi: VsCodeApi
     fileInput.style.display = 'none';
 
     let selectedFiles: File[] = [];
-    let targetFolder = getRememberedFolder() || getDefaultImagePath();
+    const targetFolder = resolveAutoImageTargetFolder(
+      getRememberedFolder(),
+      getDefaultImagePath()
+    );
 
     dialog.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -337,18 +336,6 @@ export async function showImageInsertDialog(editor: Editor, vscodeApi: VsCodeApi
     // Insert images
     const handleInsert = async () => {
       if (selectedFiles.length === 0) return;
-
-      // Get folder preference
-      if (!targetFolder) {
-        const options = await confirmImageDrop(selectedFiles.length, getDefaultImagePath());
-        if (!options) {
-          return; // User cancelled
-        }
-        targetFolder = options.targetFolder;
-        if (options.rememberChoice) {
-          setRememberedFolder(targetFolder);
-        }
-      }
 
       // Get cursor position
       const pos = editor.state.selection.from;

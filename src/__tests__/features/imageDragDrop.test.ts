@@ -15,6 +15,7 @@ import {
   isAttachmentFile,
   extractAttachmentPathFromDataTransfer,
   generateImageName,
+  resolveAutoImageTargetFolder,
   fileToBase64,
   extractImagePathFromDataTransfer,
   resolveImageInsertPosition,
@@ -273,6 +274,24 @@ describe('extractImagePathFromDataTransfer', () => {
 
   it('returns null when no data transfer is provided', () => {
     expect(extractImagePathFromDataTransfer(null)).toBeNull();
+  });
+});
+
+describe('resolveAutoImageTargetFolder', () => {
+  it('prefers remembered folder when present', () => {
+    expect(resolveAutoImageTargetFolder('screenshots', 'Files')).toBe('screenshots');
+  });
+
+  it('trims remembered folder and uses it when non-empty', () => {
+    expect(resolveAutoImageTargetFolder('  assets/img  ', 'Files')).toBe('assets/img');
+  });
+
+  it('falls back to default folder when remembered folder is missing', () => {
+    expect(resolveAutoImageTargetFolder(null, 'Files')).toBe('Files');
+  });
+
+  it('falls back to Files when both remembered and default are empty', () => {
+    expect(resolveAutoImageTargetFolder('  ', '   ')).toBe('Files');
   });
 });
 
