@@ -90,7 +90,7 @@
     "commands": [
       {
         "command": "markdownForHumans.openFile",
-        "title": "Open with Markdown for Humans"
+        "title": "Open with Markdown for Humans Local Fork"
       },
       {
         "command": "markdownForHumans.editorZoomIn",
