@@ -90,7 +90,14 @@
     "commands": [
       {
         "command": "markdownForHumans.openFile",
-        "title": "Open with Markdown for Humans Local Fork"
+        "title": "Open with Markdown for Humans Local Fork",
+        "icon": "$(arrow-right)"
+      },
+      {
+        "command": "markdownForHumans.backToMarkdown",
+        "title": "Back to Markdown",
+        "category": "Markdown for Humans",
+        "icon": "$(arrow-left)"
       },
       {
         "command": "markdownForHumans.editorZoomIn",
@@ -135,6 +142,18 @@
           "command": "markdownForHumans.openFile",
           "when": "resourceExtname == .md",
           "group": "navigation"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "markdownForHumans.openFile",
+          "when": "(resourceExtname == .md || resourceExtname == .markdown || resourceLangId == markdown) && activeCustomEditorId != markdownForHumansLocalFork.editor",
+          "group": "navigation@1"
+        },
+        {
+          "command": "markdownForHumans.backToMarkdown",
+          "when": "activeCustomEditorId == markdownForHumansLocalFork.editor",
+          "group": "navigation@2"
         }
       ],
       "view/title": [

@@ -80,6 +80,32 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(
+    vscode.commands.registerCommand(
+      'markdownForHumans.backToMarkdown',
+      async (uri?: vscode.Uri) => {
+        const activeUri =
+          vscode.window.activeTextEditor?.document.languageId === 'markdown'
+            ? vscode.window.activeTextEditor.document.uri
+            : undefined;
+        const targetUri = uri ?? activeUri;
+        if (!targetUri) {
+          return;
+        }
+
+        try {
+          await vscode.commands.executeCommand('vscode.openWith', targetUri, 'default');
+        } catch (error) {
+          console.error('[MD4H] Failed to open markdown text editor:', error);
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          vscode.window.showErrorMessage(
+            `Failed to open Markdown text editor: ${errorMessage || 'Unknown error'}`
+          );
+        }
+      }
+    )
+  );
+
+  context.subscriptions.push(
     vscode.commands.registerCommand('markdownForHumans.toggleSource', () => {
       // This will be handled by the webview
       vscode.window.activeTextEditor?.show();
