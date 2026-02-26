@@ -303,4 +303,33 @@ describe('MarkdownEditorProvider multiple editor support', () => {
       expect.stringContaining('Failed to switch to Markdown text editor')
     );
   });
+
+  it('opens extension settings for the current extension id', async () => {
+    const provider = new MarkdownEditorProvider({
+      extension: { id: 'myfork.markdown-for-humans' },
+    } as unknown as vscode.ExtensionContext);
+    const document = createDocument('content', 'file://settings.md');
+    const webview = { postMessage: jest.fn() };
+
+    (vscode.commands.executeCommand as jest.Mock).mockResolvedValue(undefined);
+
+    await (
+      provider as unknown as {
+        handleWebviewMessage: (
+          message: { type: string; [key: string]: unknown },
+          doc: vscode.TextDocument,
+          wv: { postMessage: jest.Mock }
+        ) => Promise<void>;
+      }
+    ).handleWebviewMessage(
+      { type: 'openExtensionSettings' },
+      document as unknown as vscode.TextDocument,
+      webview
+    );
+
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      'workbench.action.openSettings',
+      '@ext:myfork.markdown-for-humans'
+    );
+  });
 });

@@ -135,6 +135,7 @@ export function updateFilenameDimensions(
  * Provides WYSIWYG editing using TipTap in a webview
  */
 export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
+  private static readonly FALLBACK_EXTENSION_ID = 'myfork.markdown-for-humans';
   private static readonly PENDING_EDIT_WINDOW_MS = 100;
   private static readonly DEFAULT_EDITOR_ZOOM_LEVEL = 0;
   private static readonly MIN_EDITOR_ZOOM_LEVEL = -5;
@@ -210,6 +211,14 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
     const newKey = `webview-${++this.webviewKeyCounter}`;
     this.webviewKeys.set(webview, newKey);
     return newKey;
+  }
+
+  private getCurrentExtensionId(): string {
+    const extensionId = this.context.extension?.id;
+    if (typeof extensionId === 'string' && extensionId.length > 0) {
+      return extensionId;
+    }
+    return MarkdownEditorProvider.FALLBACK_EXTENSION_ID;
   }
 
   private registerWebviewForDocument(document: vscode.TextDocument, webview: vscode.Webview): void {
@@ -798,7 +807,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       case 'openExtensionSettings':
         vscode.commands.executeCommand(
           'workbench.action.openSettings',
-          '@ext:concretio.markdown-for-humans'
+          `@ext:${this.getCurrentExtensionId()}`
         );
         break;
       case 'exportDocument':
