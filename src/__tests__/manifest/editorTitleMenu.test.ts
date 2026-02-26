@@ -16,11 +16,11 @@ describe('package manifest editor title action', () => {
     const commands = manifest?.contributes?.commands;
     const openFileCommand = commands?.find(item => item.command === 'markdownForHumans.openFile');
     expect(openFileCommand).toBeDefined();
-    expect(openFileCommand?.icon).toBe('$(arrow-right)');
+    expect(openFileCommand?.icon).toBe('$(edit)');
 
     const command = commands?.find(item => item.command === 'markdownForHumans.backToMarkdown');
     expect(command).toBeDefined();
-    expect(command?.icon).toBe('$(arrow-left)');
+    expect(command?.icon).toBe('$(edit)');
 
     const editorTitleMenus = manifest?.contributes?.menus?.['editor/title'];
     const enableItem = editorTitleMenus?.find(

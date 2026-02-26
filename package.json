@@ -91,13 +91,13 @@
       {
         "command": "markdownForHumans.openFile",
         "title": "Open with Markdown for Humans Local Fork",
-        "icon": "$(arrow-right)"
+        "icon": "$(edit)"
       },
       {
         "command": "markdownForHumans.backToMarkdown",
         "title": "Back to Markdown",
         "category": "Markdown for Humans",
-        "icon": "$(arrow-left)"
+        "icon": "$(edit)"
       },
       {
         "command": "markdownForHumans.editorZoomIn",
