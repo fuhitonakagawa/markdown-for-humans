@@ -111,22 +111,15 @@ describe('BubbleMenuView', () => {
       expect(editor.on).toHaveBeenCalledWith('selectionUpdate', expect.any(Function));
     });
 
-    it('dispatches reopenInDefaultEditor event from return button', () => {
+    it('does not render the reopen-in-default-editor toolbar button', () => {
       const editor = createMockEditor();
       const toolbar = createFormattingToolbar(editor);
-      const onReopen = jest.fn();
-
-      window.addEventListener('reopenInDefaultEditor', onReopen as EventListener);
 
       const button = toolbar.querySelector(
         '.toolbar-button.reopen-markdown-button'
       ) as HTMLButtonElement | null;
 
-      expect(button).toBeTruthy();
-      button?.click();
-      expect(onReopen).toHaveBeenCalledTimes(1);
-
-      window.removeEventListener('reopenInDefaultEditor', onReopen as EventListener);
+      expect(button).toBeNull();
     });
   });
 
